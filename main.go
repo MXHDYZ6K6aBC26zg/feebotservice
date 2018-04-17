@@ -3,12 +3,18 @@ package main
 import (
 	//"net/http"
 	"github.com/kenmobility/feezbot/router"
+	"os"
+	"log"
 )
 
 func main() {
 	e := router.New()
+	port := os.Getenv("PORT")
 
-	e.Logger.Fatal(e.Start(":8000"))
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+	e.Logger.Fatal(e.Start(":"+port))
 }
 
 
