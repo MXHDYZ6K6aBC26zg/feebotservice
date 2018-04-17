@@ -19,12 +19,19 @@ type RowSelect struct {
 	ErrorMsg string
 }
 
-const (
+/* const (
 	host     = "localhost"
 	port     = 5433
 	user     = "postgres"
 	password = "amobi"
 	dbname   = "feebot"
+) */
+const (
+	host     = "ec2-54-225-200-15.compute-1.amazonaws.com"
+	port     = 5432
+	user     = "nzhuveeddpczkz"
+	password = "64e55fa6e3388d05b19acb42810bc09585b0d607de0193e7e1c7ffca584183d6"
+	dbname   = "d7evgdrq6pdgru"
 )
 
 var dbInfo = fmt.Sprintf("host=%s port=%d user=%s "+
