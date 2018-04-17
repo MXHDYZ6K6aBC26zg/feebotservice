@@ -7,7 +7,7 @@ import (
 )
 
 func GenerateUuid() string {
-	id,_ := uuid.NewV4()
+	id := uuid.NewV4()
 	return id.String()
 }
 
