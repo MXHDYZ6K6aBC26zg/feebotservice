@@ -1,0 +1,14 @@
+package: github.com/kenmobility/feezbot
+import:
+- package: github.com/labstack/echo
+  version: 3.3.5
+  subpackages:
+  - middleware
+- package: github.com/lib/pq
+- package: github.com/nu7hatch/gouuid
+- package: github.com/satori/go.uuid
+  version: v1.2.0
+- package: golang.org/x/crypto
+  subpackages:
+  - bcrypt
+  - acme

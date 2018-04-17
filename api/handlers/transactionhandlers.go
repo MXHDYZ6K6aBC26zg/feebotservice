@@ -1,0 +1,365 @@
+package handlers
+
+import (
+	"github.com/kenmobility/feezbot/gateways/paystack"
+	"github.com/kenmobility/feezbot/rand"
+	g "github.com/kenmobility/feezbot/gateways"
+	"fmt"
+	"net/http"
+	h "github.com/kenmobility/feezbot/helper"
+	"io/ioutil"
+	"encoding/json"
+	s "strings"
+	"errors"
+	"time"
+
+	"github.com/labstack/echo"
+)
+
+type InitializeTransaction struct {
+	InitiateTransaction struct {
+		Amount     int      `json:"amount"`
+		Channels   []string `json:"channels"`
+		FeeID      string   `json:"fee_id"`
+		MerchantID string   `json:"merchant_id"`
+		MerchantFeeID string   `json:"merchant_fee_id"`
+		Metadata   struct {
+			CustomFields []struct {
+				DisplayName string `json:"display_name"`
+				Value       string `json:"value"`
+			} `json:"custom_fields"`
+		} `json:"metadata"`
+		Username string `json:"username"`
+	} `json:"initiateTransaction"`
+}
+
+//InitiateTransaction is a POST request handler used to initiate a transaction by the user
+func InitiateTransaction(c echo.Context) error {
+	var it InitializeTransaction
+	defer c.Request().Body.Close()
+	b,err := ioutil.ReadAll(c.Request().Body)
+	if err != nil {
+		fmt.Printf("transactionhandlers.go::ChargeUserByCard()::failed to read request body due to : %s\n", err)
+		r := h.Response {
+			Status: "error",
+			Message:"error occured, please try again",//err.Error(),
+		}
+		return c.JSON(http.StatusBadRequest, r)
+	}
+	//fmt.Printf("the raw json request is %s\n", b)
+	err = json.Unmarshal(b, &it)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::InitiateTransaction()::failed to unmarshal json request body: ", err)
+		r := h.Response {
+			Status: "error",
+			Message:"error occured, please try again",//err.Error(),
+		}
+		return c.JSON(http.StatusInternalServerError, r)
+	}
+	username := it.InitiateTransaction.Username
+	merchantId := it.InitiateTransaction.MerchantID
+	merchantFeeId := it.InitiateTransaction.MerchantFeeID
+	feeId := it.InitiateTransaction.FeeID
+	amount := it.InitiateTransaction.Amount
+
+	if username == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount <= 0 {
+		r := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required parameters not complete",
+		}
+		return c.JSON(http.StatusBadRequest, r)	
+	}
+
+	_,email,emailConfStatus := isEmailConfirmed(username)
+	if emailConfStatus == false {
+		r := h.Response {
+			Status: "error",
+			Message:"Your Email address has not yet been confirmed, click 'Confirm My Email' to confirm ur Address before proceeding to make payments",
+		}
+		return c.JSON(http.StatusForbidden, r)	
+	}
+
+	//Generate a unique reference for the transaction
+	reference := rand.RandStr(18, "alphanum")
+	fmt.Println("generated reference is ", reference)
+
+	//Get the subaccount code for the merchant / fee 
+	subaccount,feeBearer,err := getSettlementAccount(merchantFeeId)
+	if err != nil {
+		fmt.Printf("transactionhandlers.go::InitiateTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
+	}
+
+	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, "", "", amount)
+	
+	bs,_:= json.Marshal(res)
+	r := h.Response {
+		Status: res.Status,
+		Message:res.ResponseMsg,
+		Data: bs,
+	}
+	return c.JSON(res.StatusCode, r)
+}
+
+
+
+func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId string,amount int,channel string) h.Response {
+	if s.Contains(res.ResponseStatus, "success") == true { 
+		fmt.Println("returned response for card transaction is success")
+		_,err := dbinsertSuccessChargeCardResponse(uId,res.Reference,res.Email,res.TxDate,res.ResponseStatus,res.TxCurrency,res.TxChannel,
+		res.AuthorizationCode,"Paystack",res.CardLast4,res.ResponseBody,res.Bank,res.CardType,res.StatusCode,res.TxAmount,res.TxFees)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during success card response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": "transaction is successful",
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "success",
+			Message:"Your transaction is successful",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+
+	if s.Contains(res.ResponseStatus, "pending") == true { 
+		fmt.Println("returned response for card transaction is pending")
+		_,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during pending card response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": "transaction is Pending",
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "error",
+			Message:"Your transaction is pending, you will receive a notification on your phone or email as regards the transaction.",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+
+	if s.Contains(res.ResponseStatus, "timeout") == true { 
+		fmt.Println("returned response for card transaction is timeout")
+		_,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::timeout error occured during card response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": res.ResponseMsg,
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "error",
+			Message: "transaction is timeout",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+
+	if s.Contains(res.ResponseStatus, "send_otp") == true { 
+		fmt.Println("returned response for card transaction is send_otp")
+		_,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::timeout error occured during card response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": res.ResponseMsg,
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "success",
+			Message: "transaction sent, an OTP is required",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+
+	if s.Contains(res.ResponseStatus, "send_pin") == true { 
+		fmt.Println("returned response for transaction is send_pin")
+		_,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during card send_pin response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": res.ResponseMsg,
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "success",
+			Message: "transaction sent, PIN is required",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+
+	if s.Contains(res.ResponseStatus, "send_birthday") == true { 
+		fmt.Println("returned response for card transaction is send_birthday")
+		_,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during card send_pin response insert is ",err)
+		}
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": res.ResponseMsg,
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "success",
+			Message: "transaction sent, birthday is required",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+	if s.Contains(res.ResponseStatus, "failed") == true { 
+		fmt.Println("returned response for transaction is failed")
+		/* _,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+
+		if err != nil {
+			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during card send_pin response insert is ",err)
+		} */
+		d := map[string]string {
+			"status" : res.ResponseStatus,
+			"reference" : res.Reference,
+			"message": res.ResponseMsg,
+		}
+		bs,_:= json.Marshal(d)
+		r := h.Response {
+			Status: "error",
+			Message: "transaction failed, please try again",
+			Data: bs,
+		}
+		return r //c.JSON(http.StatusOK, r)
+	}
+	r := h.Response {
+		Status: "error",
+		Message: res.ResponseMsg,
+		//Data: bs,
+	}
+	return r
+}
+
+func dbinsertSuccessChargeCardResponse(userId,txReference,txEmail,txDate, txStatus,txCurrency,txChannel,txAuthCode,txPaymentGateway,cardLast4,
+	responseBody, bank,cardType string, responseCode,txAmount,txFee int) (string,error) {
+
+	con, err := h.OpenConnection()
+	if err != nil {
+		return "", err
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	fmt.Println("response body for success is ",responseBody)
+	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
+	var insertedTxId string
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxProvidedEmail","TxDate","TxStatus","TxAmount","ResponseBody",
+		"ResponseCode","TxCurrency","TxChannel","TxPaymentGateway","TxAuthorizationCode","CardLast4","TxFees","Bank","CardType") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,txReference,txEmail,txDate,txStatus,txAmount,responseBody,responseCode,txCurrency,
+		txChannel,txPaymentGateway,txAuthCode,cardLast4,txFee,bank,cardType).Scan(&insertedTxId)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
+		return "",err
+	}
+	//check if the row was inserted successfully
+	if insertedTxId == "" {
+		return "", errors.New("inserting into transactions failed")
+	}
+	return insertedTxId, nil
+} 
+
+func dbinsertChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,responseBody,merchantId,feeId,userEmail string, responseCode,amount int,channel string) (string,error) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return "", err
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	var insertedTxId string
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxProvidedEmail","TxDate","TxStatus","TxAmount","ResponseBody","ResponseCode","TxChannel","TxPaymentGateway","MerchantId","FeeId") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,txReference,userEmail,time.Now(),txStatus,amount,responseBody,responseCode,channel,txPaymentGateway,merchantId,feeId).Scan(&insertedTxId)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::dbinsertChargeCardResponse()::error encountered while inserting into transactions for not success card transaction response is ", err)
+		return "",err
+	}
+	//check if the row was inserted successfully
+	if insertedTxId == "" {
+		return "", errors.New("insertion into transactions failed")
+	}
+	return insertedTxId, nil
+}
+
+func isEmailConfirmed(username string) (string,string,bool) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in connecting to database due to ",err)
+		return "","",false
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	var id,email interface{}
+	var emailConfirmed bool 
+	var uId,uEmail string
+	q := `SELECT "AspNetUsers"."Id","AspNetUsers"."Email","AspNetUsers"."EmailConfirmed" FROM "AspNetUsers" WHERE "UserName" = $1` 
+	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in fetching user's id and email confirmed status from database due to ",err)
+		return "","",false
+	}
+	if id != nil {
+		uId = id.(string)
+	}
+	if email != nil {
+		uEmail = email.(string)
+	}
+	if emailConfirmed == false {
+		return uId,uEmail,false
+	}
+	return uId,uEmail,true
+}
+
+func getSettlementAccount(merchantFeeId string) (string,string, error) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in connecting to database due to ",err)
+		return "","",err
+	}
+	defer con.Close()
+	var code,bearer interface{}
+	//var chargeByMerchant bool
+	var accountCode,feeBearer string 
+	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer" FROM "merchant_accounts" 
+	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "Enabled" = $2` 
+	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in fetching account code from database due to ",err)
+		return "","",err
+	}
+	if code == nil {
+		return "","",errors.New("account code for merchant/fee is nil")
+	}
+	if bearer == nil {
+		return "","",errors.New("fee bearer for merchant/fee is nil")
+	}
+	accountCode = code.(string)
+	feeBearer = bearer.(string)
+	return accountCode,feeBearer, nil 
+}
