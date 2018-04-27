@@ -307,35 +307,6 @@ func dbinsertChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,res
 	return insertedTxId, nil
 }
 
-func isEmailConfirmed(username string) (string,string,bool) {
-	con, err := h.OpenConnection()
-	if err != nil {
-		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in connecting to database due to ",err)
-		return "","",false
-		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
-	}
-	defer con.Close()
-	var id,email interface{}
-	var emailConfirmed bool 
-	var uId,uEmail string
-	q := `SELECT "AspNetUsers"."Id","AspNetUsers"."Email","AspNetUsers"."EmailConfirmed" FROM "AspNetUsers" WHERE "UserName" = $1` 
-	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed)
-	if err != nil {
-		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in fetching user's id and email confirmed status from database due to ",err)
-		return "","",false
-	}
-	if id != nil {
-		uId = id.(string)
-	}
-	if email != nil {
-		uEmail = email.(string)
-	}
-	if emailConfirmed == false {
-		return uId,uEmail,false
-	}
-	return uId,uEmail,true
-}
-
 func getSettlementAccount(merchantFeeId string) (string,string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {

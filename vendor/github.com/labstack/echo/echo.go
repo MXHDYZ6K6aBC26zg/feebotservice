@@ -217,7 +217,7 @@ const (
 )
 
 const (
-	Version = "3.3.5"
+	Version = "3.3.dev"
 	website = "https://echo.labstack.com"
 	// http://patorjk.com/software/taag/#p=display&f=Small%20Slant&t=Echo
 	banner = `
@@ -336,8 +336,6 @@ func (e *Echo) DefaultHTTPErrorHandler(err error, c Context) {
 	if _, ok := msg.(string); ok {
 		msg = Map{"message": msg}
 	}
-
-	e.Logger.Error(err)
 
 	// Send response
 	if !c.Response().Committed {
@@ -462,11 +460,11 @@ func static(i i, prefix, root string) *Route {
 	return i.GET(prefix+"/*", h)
 }
 
-// File registers a new route with path to serve a static file.
-func (e *Echo) File(path, file string) *Route {
+// File registers a new route with path to serve a static file with optional route-level middleware.
+func (e *Echo) File(path, file string, m ...MiddlewareFunc) *Route {
 	return e.GET(path, func(c Context) error {
 		return c.File(file)
-	})
+	}, m...)
 }
 
 // Add registers a new route for an HTTP method and path with matching handler

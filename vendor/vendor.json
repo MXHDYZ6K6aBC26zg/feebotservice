@@ -3,10 +3,46 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "VFwJJfUzB6cwRndTmB3JWKvIgmA=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
+			"revisionTime": "2018-02-21T22:46:20Z"
+		},
+		{
+			"checksumSHA1": "8jpS123oh7X8khCYQ75XzcO8YlY=",
+			"path": "github.com/davecgh/go-spew/spew/testdata",
+			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
+			"revisionTime": "2018-02-21T22:46:20Z"
+		},
+		{
+			"checksumSHA1": "zUJKKwb/caYgGLtqVIvzkjOyKWA=",
+			"path": "github.com/labstack/echo",
+			"revision": "f867058e3ba4fa4504e3ca976b31012db3ce1555",
+			"revisionTime": "2018-04-16T17:20:21Z"
+		},
+		{
+			"checksumSHA1": "Msg7Cp+10Il/HKWnKYVHx2hMKoc=",
+			"path": "github.com/labstack/echo/middleware",
+			"revision": "f867058e3ba4fa4504e3ca976b31012db3ce1555",
+			"revisionTime": "2018-04-16T17:20:21Z"
+		},
+		{
 			"checksumSHA1": "c1sqhKX+EHllakLDLWEEzbH9Dyc=",
 			"path": "github.com/lib/pq",
 			"revision": "d34b9ff171c21ad295489235aec8b6626023cd04",
 			"revisionTime": "2018-03-27T07:18:24Z"
+		},
+		{
+			"checksumSHA1": "lDGmGnGs81wjrl2nio3TeoujbvM=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
+			"revisionTime": "2016-01-10T10:55:54Z"
+		},
+		{
+			"checksumSHA1": "a7/cFoD3Vbh8Fgj6bMuqFakQM04=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "c679ae2cc0cb27ec3293fea7e254e47386f05d69",
+			"revisionTime": "2018-03-14T08:05:35Z"
 		}
 	],
 	"rootPath": "github.com/kenmobility/feezbot"

@@ -78,15 +78,6 @@ func CreateUser(c echo.Context) error {
 	}
 	fmt.Printf("json object is : %#v\n", u)
 
-	//Check for complete credentials
-	if u.Details.UserName == "" || u.Details.Password == "" || u.Details.IpAddress == "" {
-		res := h.Response {
-			Status: "error",
-			Message:"Invalid request format Or required Credentials not complete",
-		}
-		return c.JSON(http.StatusBadRequest, res)	
-	}
-
 	email := strings.ToLower(u.Details.Email)
 	username := strings.ToLower(u.Details.UserName)
 	phone := strings.ToLower(u.Details.Phone)
@@ -97,6 +88,23 @@ func CreateUser(c echo.Context) error {
 	deviceUuid := strings.ToLower(u.Details.DeviceUUID)
 	deviceImei := strings.ToLower(u.Details.DeviceIMEI)
 	ipAddress := strings.ToLower(u.Details.IpAddress)
+
+	//Check for complete credentials
+	if username == "" || u.Details.Password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)	
+	}
+
+	if emailStatus := isEmailExists(email); emailStatus {
+		res := h.Response {
+			Status: "error",
+			Message:"Email address already exist, register with another email address",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
 
 	numComplete,numPresent,upperPresent,specialChar := verifyPassword(u.Details.Password)
 	if !numComplete {
@@ -494,4 +502,53 @@ func userDevicesDelete(id string) (int64, error) {
 	}
 	affRows, _ := re.RowsAffected()
 	return affRows,nil
+}
+
+func isEmailConfirmed(username string) (string,string,bool) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in connecting to database due to ",err)
+		return "","",false
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	var id,email interface{}
+	var emailConfirmed bool 
+	var uId,uEmail string
+	q := `SELECT "AspNetUsers"."Id","AspNetUsers"."Email","AspNetUsers"."EmailConfirmed" FROM "AspNetUsers" WHERE "UserName" = $1` 
+	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in fetching user's id and email confirmed status from database due to ",err)
+		return "","",false
+	}
+	if id != nil {
+		uId = id.(string)
+	}
+	if email != nil {
+		uEmail = email.(string)
+	}
+	if emailConfirmed == false {
+		return uId,uEmail,false
+	}
+	return uId,uEmail,true
+}
+
+func isEmailExists(email string) (bool) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::isEmailExists()::error in connecting to database due to ",err)
+		return false
+	}
+	defer con.Close()
+	var existingEmail interface{}
+	q := `SELECT "AspNetUsers"."Email" FROM "AspNetUsers" WHERE "Email" = $1` 
+	err = con.Db.QueryRow(q, email).Scan(&existingEmail)
+	if err != nil {
+		fmt.Println("userhandlers.go::isEmailExists()::error in fetching email status from database due to ",err)
+		return false
+	}
+	if existingEmail == nil {
+		return false
+	}
+	return true
 }
