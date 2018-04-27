@@ -1,18 +1,21 @@
 package helper 
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
-	//"fmt"
+	"crypto/sha512"
+	//"encoding/base64"
+	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"io"
+	"strings"
 )
 
-//Hash will hash the provided input string using sha256 and return the encoded base64 string
+//Hash will hash the provided input string (which is the none, apiKey and apiSecret) using sha512 and return the string
 func Hash256(input string) string {
-	h := sha256.New()
-	h.Write([]byte(input))
-	b := h.Sum(nil)
-	return base64.URLEncoding.EncodeToString(b)
+	h512 := sha512.New()
+	io.WriteString(h512, input)
+	h := h512.Sum(nil)
+	hashedString := fmt.Sprintf("%x", h)
+	return strings.ToUpper(hashedString)
 }
 
 func BcryptHashPassword(plain string) (string, error) {

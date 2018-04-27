@@ -206,9 +206,10 @@ func Login(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func CheckHash(apiKey, apiSecret, signature string) bool {
-	concat := apiKey + apiSecret
+func CheckHash(nonce, apiKey, apiSecret, signature string) bool {
+	concat := nonce + apiKey + apiSecret
 	hashedString := h.Hash256(concat)
+	fmt.Println("hashed string is - ", hashedString)
 	if hashedString != signature {
 		return false
 	}
