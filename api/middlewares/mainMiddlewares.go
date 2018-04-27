@@ -6,6 +6,6 @@ import (
 )
 
 func SetMainMiddlewares(e *echo.Echo) {
-	//e.Use(middleware.Logger())
+	e.Use(middleware.Logger())
 	e.Use(middleware.CORS())
 }
