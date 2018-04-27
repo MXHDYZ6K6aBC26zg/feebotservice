@@ -2,7 +2,7 @@ package middlewares
 
 import (
 	"github.com/labstack/echo"
-	"log"
+	//"log"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
 	"github.com/kenmobility/feezbot/api/handlers"
