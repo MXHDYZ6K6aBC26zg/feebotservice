@@ -2,7 +2,7 @@ package middlewares
 
 import (
 	"github.com/labstack/echo"
-	//"log"
+	"log"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
 	"github.com/kenmobility/feezbot/api/handlers"
@@ -25,7 +25,7 @@ func AuthenticateRequests(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 			return c.JSON(http.StatusUnauthorized, res)
 		}
-		//fmt.Print("signature is ", signature[0], "api key is ", apiKey[0], "apiSecret is ", apiSecret[0])
+		log.Println("signature is ", signature[0], "api key is ", apiKey[0], "apiSecret is ", apiSecret[0])
 		//Hash credentials and check if it matches the one sent
 		if hCheck := handlers.CheckHash(apiKey[0], apiSecret[0], signature[0]); !hCheck {
 			res := h.Response{
