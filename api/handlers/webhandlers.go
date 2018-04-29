@@ -160,10 +160,10 @@ func isSubAccountExist(merchantId,merchantFeeId string) (bool,error) {
 		return false,nil
 	}
 	if code != nil && enabled == true {
-		return true, errors.New("subaccount for this fee/merchant already contains a code and still active, you have to disable this subaccount first if you intend to update this subaccount with different account details")
+		return true, errors.New("this account is already active and enabled")
 	}
     if code != nil && enabled == false {
-		return false, nil//errors.New("subaccount for this fee/merchant already contains a code but disabled, enabling will update the previous account details with the supplied one")
+		return false, nil
 	}
 	return false, nil
 }
