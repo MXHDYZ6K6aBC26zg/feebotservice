@@ -208,8 +208,8 @@ func Login(c echo.Context) error {
 
 func CheckHash(nonce, apiKey, apiSecret, signature string) bool {
 	concat := nonce + apiKey + apiSecret
-	hashedString := h.Hash256(concat)
-	fmt.Println("hashed string is - ", hashedString)
+	hashedString := h.Hash512(concat)
+	//fmt.Println("hashed string is - ", hashedString)
 	if hashedString != signature {
 		return false
 	}

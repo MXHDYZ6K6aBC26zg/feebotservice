@@ -8,6 +8,11 @@ import (
 	//"strings"
 )
 
+func HandleCallbackResponse(c echo.Context) error {
+	
+	return c.String(200,"success")
+}
+
 func Test(c echo.Context) error {
 	/* con, err := h.OpenConnection()
 	if err != nil {

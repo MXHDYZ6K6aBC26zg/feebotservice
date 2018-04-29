@@ -81,7 +81,7 @@ func InitiateTransaction(c echo.Context) error {
 
 	//Generate a unique reference for the transaction
 	reference := rand.RandStr(18, "alphanum")
-	fmt.Println("generated reference is ", reference)
+	fmt.Println("generated reference is - ", reference)
 
 	//Get the subaccount code for the merchant / fee 
 	subaccount,feeBearer,err := getSettlementAccount(merchantFeeId)
@@ -318,17 +318,17 @@ func getSettlementAccount(merchantFeeId string) (string,string, error) {
 	//var chargeByMerchant bool
 	var accountCode,feeBearer string 
 	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer" FROM "merchant_accounts" 
-	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "Enabled" = $2` 
+	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "merchant_accounts"."Enabled" = $2` 
 	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in fetching account code from database due to ",err)
 		return "","",err
 	}
 	if code == nil {
-		return "","",errors.New("account code for merchant/fee is nil")
+		return "","",errors.New("account code for merchant/fee not yet generated")
 	}
 	if bearer == nil {
-		return "","",errors.New("fee bearer for merchant/fee is nil")
+		return "","",errors.New("fee bearer for merchant/fee is empty")
 	}
 	accountCode = code.(string)
 	feeBearer = bearer.(string)

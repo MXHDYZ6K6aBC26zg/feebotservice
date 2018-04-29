@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-//Hash will hash the provided input string (which is the none, apiKey and apiSecret) using sha512 and return the string
-func Hash256(input string) string {
+//Hash will hash the provided input string (which is the nonce, apiKey and apiSecret) using sha512 and return the string
+func Hash512(input string) string {
 	h512 := sha512.New()
 	io.WriteString(h512, input)
 	h := h512.Sum(nil)

@@ -9,6 +9,7 @@ import(
 	"io/ioutil"
 	h "github.com/kenmobility/feezbot/helper"
 	"encoding/json"
+	"errors"
 )
 
 type SubAccount struct {
@@ -38,13 +39,13 @@ func CreateSubAccount(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)
 	}
-	//fmt.Printf("the raw json request is %s\n", b)
+	fmt.Printf("the raw json request is %s\n", b)
 	err = json.Unmarshal(b, &csa)
 	if err != nil {
 		fmt.Printf("webhandlers.go::CreateSubAccount()::failed to unmarshal json request body: %s\n", err)
 		r := h.Response {
 			Status: "error",
-			Message: err.Error(),//"error occured, please try again",//err.Error(),
+			Message: err.Error(),//"error occured, please try again",
 		}
 		return c.JSON(http.StatusInternalServerError, r)
 	}
@@ -67,7 +68,30 @@ func CreateSubAccount(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)	
 	}
-
+	status,err := isSubAccountExist(merchantId, merchantFeeId)
+	fmt.Printf("isSubAccountExist func returns error as '%s' and status as '%v' for merchant_id - '%s' and merchant_fee_id - '%s'\n",err,status,merchantId, merchantFeeId)
+	if err != nil && status == false {
+		r := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusInternalServerError, r)
+	}
+	if err != nil && status == true {
+		r := h.Response {
+			Status: "error",
+			Message: err.Error(),
+		}
+		return c.JSON(http.StatusBadRequest, r)
+	}
+	/*
+	if err != nil && status == false {
+		 r := h.Response {
+			Status: "success",
+			Message: err.Error(),
+		}
+		return c.JSON(http.StatusContinue, r) 
+	} */
 	resp := paystack.CreateSubAccount(businessName, bankName, accountNumber, contactEmail, contactName, contactPhone, percCharge)
 	
 	if settlementByMerchant == false {
@@ -112,4 +136,34 @@ func CreateSubAccount(c echo.Context) error {
 	}
 
 	return c.JSON(resp.StatusCode, r)
+}
+
+
+func isSubAccountExist(merchantId,merchantFeeId string) (bool,error) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("webhandlers.go::isSubAccountExist()::error in connecting to database due to ",err)
+		return false,err
+	}
+	defer con.Close()
+	var code, accountNumber interface{}
+	var enabled bool
+
+	q := `SELECT "merchant_accounts"."AccountCode","merchant_accounts"."AccountNumber","merchant_accounts"."Enabled" FROM "merchant_accounts" 
+		  WHERE "merchant_accounts"."MerchantId" = $1 AND "merchant_accounts"."MerchantFeeId" = $2`
+	err = con.Db.QueryRow(q, merchantId,merchantFeeId).Scan(&code,&accountNumber,&enabled)
+	if err != nil {
+		fmt.Println("webhandlers.go::isSubAccountExist()::error in fetching account code from database due to ",err)
+		return false,err
+	}
+	if code == nil && enabled == false {
+		return false,nil
+	}
+	if code != nil && enabled == true {
+		return true, errors.New("subaccount for this fee/merchant already contains a code and still active, you have to disable this subaccount first if you intend to update this subaccount with different account details")
+	}
+    if code != nil && enabled == false {
+		return false, nil//errors.New("subaccount for this fee/merchant already contains a code but disabled, enabling will update the previous account details with the supplied one")
+	}
+	return false, nil
 }

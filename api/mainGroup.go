@@ -8,4 +8,5 @@ import (
 func MainGroup(e *echo.Echo) {
 	e.GET("/", handlers.Test)
 	e.GET("/seedRoles", handlers.SeedTable)
+	e.GET("/user/transaction/callback", handlers.HandleCallbackResponse)
 }

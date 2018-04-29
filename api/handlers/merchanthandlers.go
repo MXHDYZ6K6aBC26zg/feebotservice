@@ -43,6 +43,8 @@ type fees struct {
 }
 
 func ShowMerchantsSummary(c echo.Context) error {
+	categoriesId := c.QueryParam("categoriesId")
+
 	con, err := h.OpenConnection()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
@@ -52,14 +54,14 @@ func ShowMerchantsSummary(c echo.Context) error {
 	merchant := make([]merchantInfo,0)
 	var id,title,description,photo interface{}
 	var mId,mTitle,mDescription,mPhoto string
-	q := `SELECT "Id","Title","Description","PhotoId" FROM "merchants" WHERE "Enabled" = $1`
-	mRows,err := con.Db.Query(q,true)
+	q := `SELECT "Id","Title","Description","PhotoId" FROM "merchants" WHERE "Enabled" = $1 AND CategoriesId = $2`
+	mRows,err := con.Db.Query(q,true, categoriesId)
 	defer mRows.Close()
 	if err != nil{
 		if s.Contains(fmt.Sprintf("%v", err), "no records") == true {
 			res := h.Response {
 				Status: "error",
-				Message:"No record found!",
+				Message:"No record found for the category selected!",
 			}
 			return c.JSON(http.StatusOK, res)	
 		}else{
