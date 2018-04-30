@@ -11,11 +11,11 @@ import (
 )
 
 type merchantsSummary struct {
-	Info []merchantInfo `json:"merchantsInfo"`
+	Info []merchantInfo `json:"merchants"`
 }
 
 type merchantInfo struct {
-	MerchantID    	string 		`json:"merchantId"`
+	MerchantID    	string 		`json:"merchant_id"`
 	Title 			string 		`json:"title"`
 	Description    	string 		`json:"description"`
 	Photo 			string 		`json:"photo"`
