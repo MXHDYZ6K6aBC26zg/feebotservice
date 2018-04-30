@@ -84,14 +84,6 @@ func CreateSubAccount(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)
 	}
-	/*
-	if err != nil && status == false {
-		 r := h.Response {
-			Status: "success",
-			Message: err.Error(),
-		}
-		return c.JSON(http.StatusContinue, r) 
-	} */
 	resp := paystack.CreateSubAccount(businessName, bankName, accountNumber, contactEmail, contactName, contactPhone, percCharge)
 	
 	if settlementByMerchant == false {
@@ -146,24 +138,24 @@ func isSubAccountExist(merchantId,merchantFeeId string) (bool,error) {
 		return false,err
 	}
 	defer con.Close()
-	var code, accountNumber interface{}
+	var code interface{}
 	var enabled bool
 
-	q := `SELECT "merchant_accounts"."AccountCode","merchant_accounts"."AccountNumber","merchant_accounts"."Enabled" FROM "merchant_accounts" 
+	q := `SELECT "merchant_accounts"."AccountCode","merchant_accounts"."Enabled" FROM "merchant_accounts" 
 		  WHERE "merchant_accounts"."MerchantId" = $1 AND "merchant_accounts"."MerchantFeeId" = $2`
-	err = con.Db.QueryRow(q, merchantId,merchantFeeId).Scan(&code,&accountNumber,&enabled)
+	err = con.Db.QueryRow(q, merchantId,merchantFeeId).Scan(&code,&enabled)
 	if err != nil {
 		fmt.Println("webhandlers.go::isSubAccountExist()::error in fetching account code from database due to ",err)
 		return false,err
 	}
-	if code == nil && enabled == false {
-		return false,nil
-	}
 	if code != nil && enabled == true {
 		return true, errors.New("this account is already active and enabled")
 	}
-    if code != nil && enabled == false {
+	if code != nil && enabled == false {
 		return false, nil
+	}
+	if code == nil && enabled == false {
+		return false,nil
 	}
 	return false, nil
 }

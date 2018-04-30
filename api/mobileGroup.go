@@ -27,4 +27,6 @@ func MobileGroup(g *echo.Group) {
 	g.GET("/getMerchants", handlers.ShowMerchantsSummary)
 	g.GET("/getMerchantFees", handlers.ShowMerchantFees)
 
+	//*******GET HANDLER FOR CATEGORIES***********//
+	g.GET("/getCategories", handlers.ShowCategories)
 }
