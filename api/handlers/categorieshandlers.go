@@ -15,7 +15,7 @@ type AllCategories struct {
 }
 
 type CategoriesInfo struct {
-	CategoryName        string `json:"category_Name"`
+	CategoryName        string `json:"category_name"`
 	CategoryDescription string `json:"category_description"`
 	CategoryID          string `json:"category_id"`
 }
