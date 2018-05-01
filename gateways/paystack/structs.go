@@ -139,3 +139,58 @@ type createSubAccountResponse struct {
 	Status  bool   `json:"status"`
 }
 
+type verifyTransactionResponse struct {
+	Data struct {
+		Amount        int `json:"amount"`
+		Authorization struct {
+			AuthorizationCode string `json:"authorization_code"`
+			Bank              string `json:"bank"`
+			Bin               string `json:"bin"`
+			CardType          string `json:"card_type"`
+			Channel           string `json:"channel"`
+			CountryCode       string `json:"country_code"`
+			ExpMonth          string `json:"exp_month"`
+			ExpYear           string `json:"exp_year"`
+			Last4             string `json:"last4"`
+			Reusable          bool   `json:"reusable"`
+			Signature         string `json:"signature"`
+		} `json:"authorization"`
+		Channel  string `json:"channel"`
+		Currency string `json:"currency"`
+		Customer struct {
+			CustomerCode string `json:"customer_code"`
+			Email        string `json:"email"`
+			FirstName    string `json:"first_name"`
+			ID           int    `json:"id"`
+			LastName     string `json:"last_name"`
+		} `json:"customer"`
+		Domain          string      `json:"domain"`
+		Fees            interface{} `json:"fees"`
+		GatewayResponse string      `json:"gateway_response"`
+		IPAddress       string      `json:"ip_address"`
+		Log             struct {
+			Attempts       int         `json:"attempts"`
+			Authentication interface{} `json:"authentication"`
+			Channel        interface{} `json:"channel"`
+			Errors         int         `json:"errors"`
+			History        []struct {
+				Message string `json:"message"`
+				Time    int    `json:"time"`
+				Type    string `json:"type"`
+			} `json:"history"`
+			Input     []interface{} `json:"input"`
+			Mobile    bool          `json:"mobile"`
+			Success   bool          `json:"success"`
+			TimeSpent int           `json:"time_spent"`
+		} `json:"log"`
+		Message         interface{} `json:"message"`
+		Metadata        int         `json:"metadata"`
+		Plan            string      `json:"plan"`
+		Reference       string      `json:"reference"`
+		Status          string      `json:"status"`
+		TransactionDate string      `json:"transaction_date"`
+	} `json:"data"`
+	Message string `json:"message"`
+	Status  bool   `json:"status"`
+}
+

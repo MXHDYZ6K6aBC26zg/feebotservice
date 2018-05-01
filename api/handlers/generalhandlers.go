@@ -2,16 +2,31 @@ package handlers
 
 import (
 	"github.com/labstack/echo"
+	"github.com/kenmobility/feezbot/gateways/paystack"
 	h "github.com/kenmobility/feezbot/helper"
 	"net/http"
 	"fmt"
 	//"strings"
 )
 
-func HandleCallbackResponse(c echo.Context) error {
-	
-	return c.String(200,"success")
+func HandleCallbackResponse(c echo.Context) {
+	reference := c.QueryParam("reference")
+	if reference == "" {
+		fmt.Println("no reference found")
+		return
+	}
+	resp := paystack.VerifyTransaction(reference)
+	if resp.StatusCode != 200 {
+		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
+	}
+	insertedId,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxDate,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
+	resp.Bank,resp.CardType,resp.GatewayResponse,resp.StatusCode,resp.TxAmount,resp.TxFees)
+	if err != nil {
+		fmt.Println("error encountered is ", err)
+	}
+	fmt.Println("inserted in is ", insertedId)
 }
+
 
 func Test(c echo.Context) error {
 	/* con, err := h.OpenConnection()

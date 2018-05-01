@@ -42,3 +42,25 @@ type SubAccountResponse struct {
 	MerchantFeeId			string
 	SettlementByMerchant	bool
 }
+
+type TxVerifyResponse struct {
+	StatusCode			int
+	Status 				string
+	ResponseMsg			string
+	ResponseBody 		string 
+	ResponseStatus 		string
+	GatewayResponse     string
+	Reference 			string
+	TxAmount			int
+	TxFees				int
+	TxCurrency			string
+	TxDate				string
+	TxChannel			string
+	TxSubject			string
+	TxDescription		string
+	AuthorizationCode 	string
+	CardLast4			string
+	CardType			string
+	Email				string
+	Bank				string
+}

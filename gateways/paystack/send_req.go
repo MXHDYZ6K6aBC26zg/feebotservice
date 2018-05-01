@@ -31,7 +31,7 @@ func sendHTTPRequest(url, requestMethod string) (string, int) {
 	resp, err := hc.Do(req)
 	if err != nil {
 		return fmt.Sprintf(`{"error":,"%v"}`, err), resp.StatusCode
-		//panic(err)
+		return err.Error(), -1
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()

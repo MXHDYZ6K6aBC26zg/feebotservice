@@ -3,13 +3,13 @@ package handlers
 import (
 	"github.com/kenmobility/feezbot/gateways/paystack"
 	"github.com/kenmobility/feezbot/rand"
-	g "github.com/kenmobility/feezbot/gateways"
+	//g "github.com/kenmobility/feezbot/gateways"
 	"fmt"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
 	"io/ioutil"
 	"encoding/json"
-	s "strings"
+	//s "strings"
 	"errors"
 	"time"
 
@@ -70,7 +70,7 @@ func InitiateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, r)	
 	}
 
-	_,email,emailConfStatus := isEmailConfirmed(username)
+	uId,email,emailConfStatus := isEmailConfirmed(username)
 	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
@@ -89,6 +89,12 @@ func InitiateTransaction(c echo.Context) error {
 		fmt.Printf("transactionhandlers.go::InitiateTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
 	}
 
+	//TODO: call a function to insert the details of the user and the transaction into a table
+	_,err = dbInsertUserTransaction(uId, reference, merchantId, feeId, amount)
+	if err != nil {
+		fmt.Println("error while inserting user transaction detail : ", err)
+	}
+
 	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, "", "", amount)
 	
 	bs,_:= json.Marshal(res)
@@ -100,8 +106,7 @@ func InitiateTransaction(c echo.Context) error {
 	return c.JSON(res.StatusCode, r)
 }
 
-
-
+/*
 func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId string,amount int,channel string) h.Response {
 	if s.Contains(res.ResponseStatus, "success") == true { 
 		fmt.Println("returned response for card transaction is success")
@@ -231,11 +236,11 @@ func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId stri
 	}
 	if s.Contains(res.ResponseStatus, "failed") == true { 
 		fmt.Println("returned response for transaction is failed")
-		/* _,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
+		// _,err := dbinsertChargeCardResponse(uId,res.Reference,res.ResponseStatus,"Paystack",res.ResponseBody,merchantId,feeId,uEmail,res.StatusCode,amount,channel)
 
-		if err != nil {
-			fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during card send_pin response insert is ",err)
-		} */
+		//if err != nil {
+		//	fmt.Println("transactionhandlers.go::checkResponseStatus()::error occured during card send_pin response insert is ",err)
+		//} 
 		d := map[string]string {
 			"status" : res.ResponseStatus,
 			"reference" : res.Reference,
@@ -255,10 +260,10 @@ func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId stri
 		//Data: bs,
 	}
 	return r
-}
+} */
 
-func dbinsertSuccessChargeCardResponse(userId,txReference,txEmail,txDate, txStatus,txCurrency,txChannel,txAuthCode,txPaymentGateway,cardLast4,
-	responseBody, bank,cardType string, responseCode,txAmount,txFee int) (string,error) {
+func dbUpdateChargeResponse(txReference,txEmail,txDate, txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse string, 
+	responseCode,txAmount,txFee int) (string,error) {
 
 	con, err := h.OpenConnection()
 	if err != nil {
@@ -266,14 +271,12 @@ func dbinsertSuccessChargeCardResponse(userId,txReference,txEmail,txDate, txStat
 		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
-	fmt.Println("response body for success is ",responseBody)
+	//fmt.Println("response body for success is ",responseBody)
 	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxProvidedEmail","TxDate","TxStatus","TxAmount","ResponseBody",
-		"ResponseCode","TxCurrency","TxChannel","TxPaymentGateway","TxAuthorizationCode","CardLast4","TxFees","Bank","CardType") 
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,txReference,txEmail,txDate,txStatus,txAmount,responseBody,responseCode,txCurrency,
-		txChannel,txPaymentGateway,txAuthCode,cardLast4,txFee,bank,cardType).Scan(&insertedTxId)
+	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxDate" = $2, "TxStatus" = $3, "TxAmount" = $4, "ResponseBody" = $5, "ResponseCode" = $6,
+	"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14 WHERE "TxReference" = $15  RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee,bank,cardType,txReference).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
 		return "",err
@@ -281,11 +284,11 @@ func dbinsertSuccessChargeCardResponse(userId,txReference,txEmail,txDate, txStat
 	//check if the row was inserted successfully
 	if insertedTxId == "" {
 		return "", errors.New("inserting into transactions failed")
-	}
+	} 
 	return insertedTxId, nil
 } 
 
-func dbinsertChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,responseBody,merchantId,feeId,userEmail string, responseCode,amount int,channel string) (string,error) {
+func dbUpdateChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,responseBody,merchantId,feeId,userEmail string, responseCode,amount int,channel string) (string,error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -333,4 +336,28 @@ func getSettlementAccount(merchantFeeId string) (string,string, error) {
 	accountCode = code.(string)
 	feeBearer = bearer.(string)
 	return accountCode,feeBearer, nil 
+}
+
+func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) (string, error) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return "", err
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+
+	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
+	var insertedTxId string
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxAmount","TxPaymentGateway","MerchantId","FeeId") 
+		VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,amount,"PayStack",merchantId,feeId).Scan(&insertedTxId)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
+		return "",err
+	}
+	//check if the row was inserted successfully
+	if insertedTxId == "" {
+		return "", errors.New("inserting into payment_transactions failed")
+	}
+	return insertedTxId, nil
 }
