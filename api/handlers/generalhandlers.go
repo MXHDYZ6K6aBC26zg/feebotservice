@@ -9,11 +9,11 @@ import (
 	//"strings"
 )
 
-func HandleCallbackResponse(c echo.Context) {
+func HandleCallbackResponse(c echo.Context) error{
 	reference := c.QueryParam("reference")
 	if reference == "" {
 		fmt.Println("no reference found")
-		return
+		return c.JSON(http.StatusInternalServerError, "no reference found")
 	}
 	resp := paystack.VerifyTransaction(reference)
 	if resp.StatusCode != 200 {
@@ -25,6 +25,8 @@ func HandleCallbackResponse(c echo.Context) {
 		fmt.Println("error encountered is ", err)
 	}
 	fmt.Println("inserted in is ", insertedId)
+	return c.String(http.StatusOK, insertedId)
+
 }
 
 
