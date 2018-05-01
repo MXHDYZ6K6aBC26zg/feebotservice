@@ -14,7 +14,7 @@ func main() {
 
 	if port == "" {
 		log.Println("PORT must be set")
-		port = "8000"
+		//port = "8000"
 	}
 	e.Logger.Fatal(e.Start(":"+port))
 }
