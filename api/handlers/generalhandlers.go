@@ -6,15 +6,17 @@ import (
 	h "github.com/kenmobility/feezbot/helper"
 	"net/http"
 	"fmt"
-	//"strings"
+	"log"
 )
 
 func HandleCallbackResponse(c echo.Context) error{
 	reference := c.QueryParam("reference")
 	if reference == "" {
-		fmt.Println("no reference found")
+		log.Println("no reference found")
 		return c.JSON(http.StatusInternalServerError, "no reference found")
 	}
+	log.Println("reference is ", reference)
+
 	resp := paystack.VerifyTransaction(reference)
 	if resp.StatusCode != 200 {
 		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
@@ -26,7 +28,6 @@ func HandleCallbackResponse(c echo.Context) error{
 	}
 	fmt.Println("inserted in is ", insertedId)
 	return c.String(http.StatusOK, insertedId)
-
 }
 
 

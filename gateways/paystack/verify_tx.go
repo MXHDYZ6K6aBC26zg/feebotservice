@@ -19,6 +19,7 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 			ResponseMsg :  resp,
 		}
 	}
+	fmt.Println(resp)
 	var vtr verifyTransactionResponse
 	err := json.Unmarshal([]byte(resp), &vtr)
 	if err != nil {
