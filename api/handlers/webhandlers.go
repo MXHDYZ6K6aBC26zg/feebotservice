@@ -39,7 +39,7 @@ func CreateSubAccount(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)
 	}
-	fmt.Printf("the raw json request is %s\n", b)
+	//fmt.Printf("the raw json request is %s\n", b)
 	err = json.Unmarshal(b, &csa)
 	if err != nil {
 		fmt.Printf("webhandlers.go::CreateSubAccount()::failed to unmarshal json request body: %s\n", err)

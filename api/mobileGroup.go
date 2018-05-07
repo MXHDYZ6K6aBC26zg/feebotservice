@@ -29,4 +29,7 @@ func MobileGroup(g *echo.Group) {
 
 	//*******GET HANDLER FOR CATEGORIES***********//
 	g.GET("/getCategories", handlers.ShowCategories)
+
+	//******POST HANDLER FOR DEVICE COORDINATES******//
+	g.POST("/user/insert/coordinates", handlers.UserDeviceCoordinate)
 }
