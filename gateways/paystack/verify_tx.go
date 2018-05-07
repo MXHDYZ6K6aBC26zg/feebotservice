@@ -32,9 +32,10 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 			ResponseMsg :  vtr.Message,
 		}
 	} 
-	var txFees int
+	var txFees float64
+
 	if vtr.Data.Fees != nil {
-		txFees = vtr.Data.Fees.(int)
+		txFees = vtr.Data.Fees.(float64)
 	}
 	if s.Contains(fmt.Sprintf("%v", vtr.Data.Status), "success") == false { 
 		return &g.TxVerifyResponse {

@@ -263,7 +263,7 @@ func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId stri
 } */
 
 func dbUpdateChargeResponse(txReference,txEmail,txDate, txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse string, 
-	responseCode,txAmount,txFee int) (string,error) {
+	responseCode,txAmount int, txFee float64) (string,error) {
 
 	con, err := h.OpenConnection()
 	if err != nil {

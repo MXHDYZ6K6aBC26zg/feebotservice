@@ -18,6 +18,7 @@ type CategoriesInfo struct {
 	CategoryName        string `json:"category_name"`
 	CategoryDescription string `json:"category_description"`
 	CategoryID          string `json:"category_id"`
+	CategoryPhoto		string `json:"category_photo"`
 }
 
 func ShowCategories(c echo.Context) error {
@@ -29,10 +30,10 @@ func ShowCategories(c echo.Context) error {
 
 	catSlice := make([]CategoriesInfo,0)
 
-	var catName, catDesc, catId interface{}
-	var sCatName, sCatDesc, sCatId string
+	var catName, catDesc, catId,iCatPhoto interface{}
+	var sCatName, sCatDesc, sCatId,sCatPhoto string
 
-	q := `SELECT "Id","Category","Description" FROM "_categories"`
+	q := `SELECT "Id","Category","Description","PhotoId" FROM "_categories"`
 	catRows,err := con.Db.Query(q)
 	defer catRows.Close()
 	if err != nil{
@@ -48,7 +49,7 @@ func ShowCategories(c echo.Context) error {
 		}
 	}
 	for catRows.Next() {
-		err = catRows.Scan(&catId,&catName,&catDesc)
+		err = catRows.Scan(&catId,&catName,&catDesc,&iCatPhoto)
 		if err != nil {
 			fmt.Println("categorieshandlers.go::ShowCategories()::scanning query Failed due to:", err)
 		}
@@ -61,11 +62,14 @@ func ShowCategories(c echo.Context) error {
 		if catDesc != nil {
 			sCatDesc = catDesc.(string)
 		}
-
+		if iCatPhoto != nil {
+			sCatPhoto = iCatPhoto.(string)
+		}
 		c := CategoriesInfo {
 			CategoryID : sCatId,
 			CategoryName : sCatName,
 			CategoryDescription : sCatDesc,
+			CategoryPhoto: sCatPhoto,
 		}
 		catSlice = append(catSlice, c)
 	}

@@ -146,6 +146,7 @@ type verifyTransactionResponse struct {
 			AuthorizationCode string `json:"authorization_code"`
 			Bank              string `json:"bank"`
 			Bin               string `json:"bin"`
+			Brand             string `json:"brand"`
 			CardType          string `json:"card_type"`
 			Channel           string `json:"channel"`
 			CountryCode       string `json:"country_code"`
@@ -155,24 +156,31 @@ type verifyTransactionResponse struct {
 			Reusable          bool   `json:"reusable"`
 			Signature         string `json:"signature"`
 		} `json:"authorization"`
-		Channel  string `json:"channel"`
-		Currency string `json:"currency"`
-		Customer struct {
-			CustomerCode string `json:"customer_code"`
-			Email        string `json:"email"`
-			FirstName    string `json:"first_name"`
-			ID           int    `json:"id"`
-			LastName     string `json:"last_name"`
+		Channel   string `json:"channel"`
+		CreatedAt string `json:"createdAt"`
+		Created_At string `json:"created_at"`
+		Currency  string `json:"currency"`
+		Customer  struct {
+			CustomerCode string      `json:"customer_code"`
+			Email        string      `json:"email"`
+			FirstName    interface{} `json:"first_name"`
+			ID           int         `json:"id"`
+			LastName     interface{} `json:"last_name"`
+			Metadata     interface{} `json:"metadata"`
+			Phone        interface{} `json:"phone"`
+			RiskAction   string      `json:"risk_action"`
 		} `json:"customer"`
 		Domain          string      `json:"domain"`
 		Fees            interface{} `json:"fees"`
+		FeesSplit       interface{} `json:"fees_split"`
 		GatewayResponse string      `json:"gateway_response"`
+		ID              int         `json:"id"`
 		IPAddress       string      `json:"ip_address"`
 		Log             struct {
-			Attempts       int         `json:"attempts"`
-			Authentication interface{} `json:"authentication"`
-			Channel        interface{} `json:"channel"`
-			Errors         int         `json:"errors"`
+			Attempts       int    `json:"attempts"`
+			Authentication string `json:"authentication"`
+			Channel        string `json:"channel"`
+			Errors         int    `json:"errors"`
 			History        []struct {
 				Message string `json:"message"`
 				Time    int    `json:"time"`
@@ -183,9 +191,17 @@ type verifyTransactionResponse struct {
 			Success   bool          `json:"success"`
 			TimeSpent int           `json:"time_spent"`
 		} `json:"log"`
-		Message         interface{} `json:"message"`
-		Metadata        int         `json:"metadata"`
-		Plan            string      `json:"plan"`
+		Message  interface{} `json:"message"`
+		Metadata struct {
+			CustomFields []struct {
+				DisplayName string `json:"display_name"`
+				Value       string `json:"value"`
+			} `json:"custom_fields"`
+		} `json:"metadata"`
+		PaidAt          string      `json:"paidAt"`
+		Paid_At          string      `json:"paid_at"`
+		Plan            interface{} `json:"plan"`
+		PlanObject      struct{}    `json:"plan_object"`
 		Reference       string      `json:"reference"`
 		Status          string      `json:"status"`
 		TransactionDate string      `json:"transaction_date"`
@@ -193,4 +209,3 @@ type verifyTransactionResponse struct {
 	Message string `json:"message"`
 	Status  bool   `json:"status"`
 }
-

@@ -52,7 +52,7 @@ type TxVerifyResponse struct {
 	GatewayResponse     string
 	Reference 			string
 	TxAmount			int
-	TxFees				int
+	TxFees				float64
 	TxCurrency			string
 	TxDate				string
 	TxChannel			string
