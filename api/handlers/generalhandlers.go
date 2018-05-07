@@ -67,6 +67,7 @@ func Test(c echo.Context) error {
 
 func SeedTable(c echo.Context) error {
 	roleName := c.QueryParam("name")
+	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
@@ -81,5 +82,13 @@ func SeedTable(c echo.Context) error {
 	affRows,_ := re.RowsAffected()
 	return c.String(http.StatusOK, fmt.Sprintf("affected %v Row(s)",affRows))
 } 
+
+func Test2(c echo.Context) error {
+	userId := c.FormValue("userId")
+	username := c.FormValue("username")
+
+	fmt.Println("user id -", userId, "username ", username)
+	return c.String(http.StatusOK, "Form data test")
+}
 
 
