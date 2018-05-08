@@ -22,34 +22,16 @@ import(
 } */
 
 func UserDeviceCoordinate(c echo.Context) error {
-	/* var dc DeviceCoordinate
-	defer c.Request().Body.Close()
-	b,err := ioutil.ReadAll(c.Request().Body)
-	if err != nil {
-		fmt.Printf("coordinatehandler.go::UserDeviceCoordinate()::failed to read request body due to : %s\n", err)
-		r := h.Response {
-			Status: "error",
-			Message: err.Error(), //"error occured, please try again",//err.Error(),
-		}
-		return c.JSON(http.StatusBadRequest, r)
-	}
-	//fmt.Printf("the raw json request is %s\n", b)
-	err = json.Unmarshal(b, &dc)
-	if err != nil {
-		fmt.Printf("coordinatehandler.go::UserDeviceCoordinate()::failed to unmarshal json request body: %s\n", err)
-		r := h.Response {
-			Status: "error",
-			Message: err.Error(),//"error occured, please try again",
-		}
-		return c.JSON(http.StatusInternalServerError, r)
-	} */
+
 	uId := c.FormValue("userId")
 	username := c.FormValue("username")	
 	email := c.FormValue("email")
 	uuid := c.FormValue("uuid")	
 	latitude := c.FormValue("latitude")
 	longitude := c.FormValue("longitude")
-	phone := c.FormValue("phone")	
+	phone := c.FormValue("phone")
+
+	//fmt.Println("uId-", uId, "username - ", username,"uuid- ", uuid, "latitude- ",latitude, "longitude- ",longitude, "phone- ",phone)
 
 	if uuid == "" || longitude == "" || latitude == "" {
 		r := h.Response {

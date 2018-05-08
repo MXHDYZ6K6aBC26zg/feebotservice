@@ -33,7 +33,7 @@ func ShowCategories(c echo.Context) error {
 	var catName, catDesc, catId,iCatPhoto interface{}
 	var sCatName, sCatDesc, sCatId,sCatPhoto string
 
-	q := `SELECT "Id","Category","Description","PhotoId" FROM "_categories"`
+	q := `SELECT "_categories"."Id","_categories"."Category","_categories"."Description","photos"."NormalImage" FROM "_categories" INNER JOIN "photos" ON "photos"."Id" = "_categories"."PhotoId"`
 	catRows,err := con.Db.Query(q)
 	defer catRows.Close()
 	if err != nil{
