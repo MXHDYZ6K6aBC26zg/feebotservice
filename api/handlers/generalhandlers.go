@@ -358,21 +358,31 @@ func HandleCallbackResponse(c echo.Context) error{
 	if resp.StatusCode != 200 {
 		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
 	}
-	_,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
-	resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
-	if err != nil {
-		fmt.Println("error encountered is ", err)
+
+	var updatedStatus bool
+	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
+	uStatus,_ := h.DBSelect(q,reference)
+	if uStatus != nil {
+		updatedStatus = uStatus.(bool)
 	}
+	
+	if updatedStatus == false {
+		_,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
+				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
+		if err != nil {
+			fmt.Println("error encountered is ", err)
+		}
+	}
+	
 	if resp.ResponseStatus != "success" {
 		return c.HTML(http.StatusOK,txFailedResp)
 	}
 	return c.HTML(http.StatusOK, txSuccessResp)
-	//fmt.Println("inserted in is ", insertedId)
 }
 
 func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount, 
 	responseCode,txAmount int, txFee float64) (string,error) {
-
+	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -384,8 +394,8 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 	//fmt.Println("gotten timestamp is- ",txDate, "parsed timestamp is- ",txTimeStamp)
 	var insertedTxId string
 	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,
-	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19 WHERE "TxReference" = $20  RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,txReference).Scan(&insertedTxId)
+	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
 		return "",err
