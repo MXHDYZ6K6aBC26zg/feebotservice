@@ -30,7 +30,6 @@ func sendHTTPRequest(url, requestMethod string) (string, int) {
 	hc := http.Client{}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return fmt.Sprintf(`{"error":,"%v"}`, err), resp.StatusCode
 		return err.Error(), -1
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
@@ -52,7 +51,7 @@ func sendHTTPPostRequest(url, requestMethod, postData string) (string,int) {
 	resp, err := hc.Do(req)
 	if err != nil {
 		fmt.Println("http post", resp, "error:", err)
-		return err.Error(), -1//resp.StatusCode//fmt.Sprintf(`{"error":,"%v"}`, err),
+		return err.Error(), -1
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()

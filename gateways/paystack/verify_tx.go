@@ -12,7 +12,7 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 
 	resp,statusCode := sendHTTPRequest(url, "GET")
 	if statusCode == -1 {
-		fmt.Println("subaccount.go::CreateSubAccount()::error in making request due to: ", resp)
+		fmt.Println("verify_tx.go::VerifyTransaction()::error in making request due to: ", resp)
 		return &g.TxVerifyResponse {
 			StatusCode: statusCode,
 			Status : "error",
@@ -48,6 +48,8 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 			Reference: vtr.Data.Reference,
 			TxAmount: vtr.Data.Amount,
 			TxFees: txFees,
+			TxCreatedAt: vtr.Data.TransactionDate,
+			PaidAt: vtr.Data.PaidAt,
 			TxCurrency: vtr.Data.Currency,
 			TxChannel: vtr.Data.Channel,
 			AuthorizationCode: vtr.Data.Authorization.AuthorizationCode,
@@ -66,7 +68,13 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 		GatewayResponse: vtr.Data.GatewayResponse,
 		Reference: vtr.Data.Reference,
 		TxAmount: vtr.Data.Amount,
+		SubAccountSettlementAmount: vtr.Data.FeesSplit.Subaccount,
+		MainAccountSettlementAmount: vtr.Data.FeesSplit.Integration,
+		TxFeeBearer: vtr.Data.FeesSplit.Params.Bearer,
+		PercentageCharged: vtr.Data.FeesSplit.Params.PercentageCharge,
 		TxFees: txFees,
+		TxCreatedAt: vtr.Data.TransactionDate,
+		PaidAt: vtr.Data.PaidAt,
 		TxCurrency: vtr.Data.Currency,
 		TxChannel: vtr.Data.Channel,
 		AuthorizationCode: vtr.Data.Authorization.AuthorizationCode,

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	h "github.com/kenmobility/feezbot/helper"
 	"net/http"
-	"io/ioutil"
+	//"io/ioutil"
 	"encoding/json"
 	s "strings"
 	"time"
@@ -22,16 +22,16 @@ type UserCred struct {
 	IpAddress string `json:"ipAddress"`	
 }
 
-type UserLoginResponse struct {
+/* type UserLoginResponse struct {
 	h.Response
-	UserInfo UserInfo `json:"userInfo"`	
-}
+	//UserInfo UserInfo `json:"userInfo"`	
+} */
 
-type UserInfo struct {
+/* type UserInfo struct {
 	LastName  string `json:"lastname"`
 	OtherName string `json:"othername"`
 	UserName  string `json:"username"`
-} 
+}  */
 
 func CheckPassword(c echo.Context) error {
 	password := c.QueryParam("password")
@@ -55,7 +55,7 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
-	var u UserLogin
+	/* var u UserLogin
 	defer c.Request().Body.Close()
 	b,err := ioutil.ReadAll(c.Request().Body)
 	if err != nil {
@@ -71,29 +71,37 @@ func Login(c echo.Context) error {
 			Message:"Invalid request format Or required Credentials not complete",
 		}
 		return c.JSON(http.StatusBadRequest, res)
-	}
+	} */
+	username := s.ToLower(s.Trim(c.FormValue("username")," "))	
+	password := c.FormValue("password")
+	ipAddress := c.FormValue("ipAddress")
+	deviceAgent := c.FormValue("deviceAgent")
 	//Check for complete credentials
-	if u.Details.Username == "" || u.Details.Password == "" || u.Details.IpAddress == "" {
+	/* if u.Details.Username == "" || u.Details.Password == "" || u.Details.IpAddress == "" {
 		res := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required Credentials not complete",
 		}
 		return c.JSON(http.StatusBadRequest, res)	
-	} 
-
-	username := s.ToLower(s.Trim(u.Details.Username," "))
-	uIpAddress := u.Details.IpAddress
+	}  */
+	if username == "" || password == "" || ipAddress == "" || deviceAgent == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)	
+	}
 
 	//fmt.Printf("json object is : %#v\n", u)
 	//check if username exists on the db
-	var id,email,password,phone, emailConfirmed, phoneConfirmed,lockOutEnabled, twoFaEnabled, lastName, otherNames interface{}
+	var id,email,fPassword,phone, emailConfirmed, phoneConfirmed,lockOutEnabled, twoFaEnabled, lastName, otherNames interface{}
 	var uId,uEmail,uPasswordHash, uPhone, uLastName, uOtherNames string
 	var uEmailConf, uPhoneConf, uTwoFaEnabled,uLockoutEnabled bool
 	q := `SELECT "AspNetUsers"."Id","AspNetUsers"."Email","AspNetUsers"."EmailConfirmed","AspNetUsers"."PasswordHash",
 			"AspNetUsers"."PhoneNumber","AspNetUsers"."PhoneNumberConfirmed","AspNetUsers"."LockoutEnabled",
 			"AspNetUsers"."TwoFactorEnabled", "profiles"."LastName", "profiles"."OtherNames" FROM "AspNetUsers" INNER JOIN "profiles" ON
 			"AspNetUsers"."Id" = "profiles"."UserId" WHERE "AspNetUsers"."UserName" = $1`
-	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed,&password,&phone,&phoneConfirmed,&lockOutEnabled,&twoFaEnabled,&lastName,&otherNames)
+	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed,&fPassword,&phone,&phoneConfirmed,&lockOutEnabled,&twoFaEnabled,&lastName,&otherNames)
 	if err != nil {
 		//fmt.Println("error is :", err.Error())
 		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
@@ -117,8 +125,8 @@ func Login(c echo.Context) error {
 	if emailConfirmed != nil {
 		uEmailConf = emailConfirmed.(bool)
 	}
-	if password != nil {
-		uPasswordHash = password.(string)
+	if fPassword != nil {
+		uPasswordHash = fPassword.(string)
 	}
 	if phone != nil {
 		uPhone = phone.(string)
@@ -142,7 +150,7 @@ func Login(c echo.Context) error {
 		uId,uEmail,uPasswordHash,uPhone,uEmailConf,uPhoneConf,uLockoutEnabled,uTwoFaEnabled,uLastName,uOtherNames)
 
 	//validate user's supplied password
-	if isPasswordValid := h.BcryptValidatePassword(u.Details.Password, uPasswordHash); !isPasswordValid {
+	if isPasswordValid := h.BcryptValidatePassword(password, uPasswordHash); !isPasswordValid {
 		//increment AccessFailedCount field of the user
 		err := incrementAccessFailedCount(username) 
 		if err != nil {
@@ -158,11 +166,11 @@ func Login(c echo.Context) error {
 	//check if user account has been locked out
 	if uLockoutEnabled == true {
 		//insert into user Audits table with auditEvent as 'AccountLockout'
-		userAuditId, err := userAuditsInsert(uId, uIpAddress, "AccountLockout")
+		_, err := userAuditsInsert(uId, ipAddress,deviceAgent, "AccountLockout")
 		if err != nil {
 			fmt.Println("failed to insert into user audits table due to ", err)
 		}
-		fmt.Println("id inserted into user audits account is ", userAuditId)
+		//fmt.Println("id inserted into user audits account is ", userAuditId)
 		res := h.Response {
 			Status: "error",
 			Message:"User Account locked out, Contact Admin",
@@ -186,24 +194,33 @@ func Login(c echo.Context) error {
 	}
 
 	//insert into user Audits table with auditEvent as 'Login'
-	_, err = userAuditsInsert(uId, uIpAddress, "Login")
+	_, err = userAuditsInsert(uId, ipAddress, deviceAgent,"Login")
 	if err != nil {
 		fmt.Println("failed to insert into user audits table for successfull login due to ", err)
 	}	
+	uDetail := map[string]string {
+		"last_name": uLastName,
+		"other_name": uOtherNames,
+		"username": username,
+	}
+	bs,_:= json.Marshal(uDetail)
 	dRes := h.Response {
 		Status: "success",
 		Message:"Logged In Successfully",
+		Data: bs,
 	}
-	uDetail := UserInfo {
+	/* uDetail := UserInfo {
 		LastName: uLastName,
 		OtherName: uOtherNames,
 		UserName:username,
-	}
-	res := UserLoginResponse {
+	} */
+	
+	
+	/* res := UserLoginResponse {
 		dRes,
-		uDetail,
-	} 
-	return c.JSON(http.StatusOK, res)
+		bs,
+	}  */
+	return c.JSON(http.StatusOK, dRes)
 }
 
 func CheckHash(nonce, apiKey, apiSecret, signature string) bool {
@@ -232,6 +249,7 @@ func ValidateSignature(apiKey, apiSecret, signature string) (bool, string) {
 			return false, "Invalid Api credentials"
 		}
 		fmt.Println("authenticationhandlers.go::ValidateSignature(): failed selecting from api_accounts due to ", err)	
+		return false, err.Error()
 	} 
 	/* if userId.(string) == "null" {
 		fmt.Println("user id equal to empty")

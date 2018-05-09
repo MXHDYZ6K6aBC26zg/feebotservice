@@ -9,18 +9,6 @@ import(
 	"time"
 )
 
-/* type DeviceCoordinate struct {
-	PushCoordinate struct {
-		DeviceUUID  string `json:"device_uuid"`
-		Email       string `json:"email"`
-		Latitude    string `json:"latitude"`
-		Longitude   string `json:"longitude"`
-		PhoneNumber string `json:"phone_number"`
-		UserID      string `json:"user_id"`
-		Username    string `json:"username"`
-	} `json:"pushCoordinate"`
-} */
-
 func UserDeviceCoordinate(c echo.Context) error {
 
 	uId := c.FormValue("userId")

@@ -9,7 +9,7 @@ import (
 	h "github.com/kenmobility/feezbot/helper"
 	"io/ioutil"
 	"encoding/json"
-	//s "strings"
+	s "strings"
 	"errors"
 	"time"
 
@@ -87,6 +87,11 @@ func InitiateTransaction(c echo.Context) error {
 	subaccount,feeBearer,err := getSettlementAccount(merchantFeeId)
 	if err != nil {
 		fmt.Printf("transactionhandlers.go::InitiateTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
+		r := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusForbidden, r)
 	}
 
 	//TODO: call a function to insert the details of the user and the transaction into a table
@@ -262,32 +267,6 @@ func checkResponseStatus(res *g.ChargeResponse, uId,uEmail,merchantId,feeId stri
 	return r
 } */
 
-func dbUpdateChargeResponse(txReference,txEmail,txDate, txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse string, 
-	responseCode,txAmount int, txFee float64) (string,error) {
-
-	con, err := h.OpenConnection()
-	if err != nil {
-		return "", err
-		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
-	}
-	defer con.Close()
-	//fmt.Println("response body for success is ",responseBody)
-	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
-	var insertedTxId string
-	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxDate" = $2, "TxStatus" = $3, "TxAmount" = $4, "ResponseBody" = $5, "ResponseCode" = $6,
-	"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14 WHERE "TxReference" = $15  RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee,bank,cardType,txReference).Scan(&insertedTxId)
-	if err != nil {
-		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
-		return "",err
-	}
-	//check if the row was inserted successfully
-	if insertedTxId == "" {
-		return "", errors.New("inserting into transactions failed")
-	} 
-	return insertedTxId, nil
-} 
-
 func dbUpdateChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,responseBody,merchantId,feeId,userEmail string, responseCode,amount int,channel string) (string,error) {
 	con, err := h.OpenConnection()
 	if err != nil {
@@ -325,7 +304,9 @@ func getSettlementAccount(merchantFeeId string) (string,string, error) {
 	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in fetching account code from database due to ",err)
-		return "","",err
+		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
+			return "","",errors.New("Sorry, selected fee is yet to be enabled")
+		}
 	}
 	if code == nil {
 		return "","",errors.New("account code for merchant/fee not yet generated")
@@ -348,9 +329,9 @@ func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) 
 
 	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxAmount","TxPaymentGateway","MerchantId","FeeId") 
-		VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,amount,"PayStack",merchantId,feeId).Scan(&insertedTxId)
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err

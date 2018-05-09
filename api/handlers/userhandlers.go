@@ -266,7 +266,7 @@ func CreateUser(c echo.Context) error {
 	fmt.Println("user_devices id ", userDevicesId)
 
 	//Execute user_audits table insert
-	userAuditId, err := userAuditsInsert(userId, ipAddress, "AccountCreated")
+	userAuditId, err := userAuditsInsert(userId, ipAddress, "mobile","AccountCreated")
 	if err != nil {
 		fmt.Println("inserting into profiles table failed due to ", err)
 		affRows1, _ := aspNetUsersDelete(userId)
@@ -442,7 +442,7 @@ func profilesDelete(id string) (int64, error) {
 	return affRows,nil
 }
 
-func userAuditsInsert(userId,ipAddress,auditEvent string) (string,error) {
+func userAuditsInsert(userId,ipAddress,deviceAgent,auditEvent string) (string,error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -450,7 +450,7 @@ func userAuditsInsert(userId,ipAddress,auditEvent string) (string,error) {
 	defer con.Close()
 	var insertedId string
 	insertQuery := `INSERT INTO "user_audits"("Id","UserId","UserClient","IpAddress","AuditEvent","TimeStamp") VALUES($1,$2,$3,$4,$5,$6) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,"mobile",ipAddress,auditEvent, time.Now()).Scan(&insertedId)
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,deviceAgent,ipAddress,auditEvent, time.Now()).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into profiles table due to ", err)
 		return "",err

@@ -62,6 +62,16 @@ type paystackSuccessChargeResponse struct {
 		} `json:"customer"`
 		Domain          string      `json:"domain"`
 		Fees            int         `json:"fees"`
+		FeesSplit struct {
+			Integration int `json:"integration"`
+			Params      struct {
+				Bearer            string `json:"bearer"`
+				PercentageCharge  string `json:"percentage_charge"`
+				TransactionCharge string `json:"transaction_charge"`
+			} `json:"params"`
+			Paystack   int `json:"paystack"`
+			Subaccount int `json:"subaccount"`
+		} `json:"fees_split"`
 		GatewayResponse string      `json:"gateway_response"`
 		IPAddress       string      `json:"ip_address"`
 		Log             interface{} `json:"log"`
@@ -172,7 +182,16 @@ type verifyTransactionResponse struct {
 		} `json:"customer"`
 		Domain          string      `json:"domain"`
 		Fees            interface{} `json:"fees"`
-		FeesSplit       interface{} `json:"fees_split"`
+		FeesSplit struct {
+			Integration int `json:"integration"`
+			Params      struct {
+				Bearer            string `json:"bearer"`
+				PercentageCharge  string `json:"percentage_charge"`
+				TransactionCharge string `json:"transaction_charge"`
+			} `json:"params"`
+			Paystack   int `json:"paystack"`
+			Subaccount int `json:"subaccount"`
+		} `json:"fees_split"`
 		GatewayResponse string      `json:"gateway_response"`
 		ID              int         `json:"id"`
 		IPAddress       string      `json:"ip_address"`
