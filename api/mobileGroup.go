@@ -12,6 +12,10 @@ func MobileGroup(g *echo.Group) {
 	g.POST("/login", handlers.Login)
 	g.POST("/user/create", handlers.CreateUser)
 
+	//*******HANDLERS FOR FORGOTTEN PASSWORD***********//
+	g.POST("/user/validate", handlers.ValidateUserExistence)
+	
+
 	//*******HANDLERS FOR TRANSACTIONS***********//
 	g.POST("/user/transaction/initiate", handlers.InitiateTransaction)
 	//g.POST("/user/pay/card", handlers.ChargeUserByCard)

@@ -22,17 +22,6 @@ type UserCred struct {
 	IpAddress string `json:"ipAddress"`	
 }
 
-/* type UserLoginResponse struct {
-	h.Response
-	//UserInfo UserInfo `json:"userInfo"`	
-} */
-
-/* type UserInfo struct {
-	LastName  string `json:"lastname"`
-	OtherName string `json:"othername"`
-	UserName  string `json:"username"`
-}  */
-
 func CheckPassword(c echo.Context) error {
 	password := c.QueryParam("password")
 	/* passHash,err := h.CreateHash(password)
@@ -55,35 +44,12 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
-	/* var u UserLogin
-	defer c.Request().Body.Close()
-	b,err := ioutil.ReadAll(c.Request().Body)
-	if err != nil {
-		fmt.Printf("authenticationhandlers.go::Login(): failed to read request body due to : %s", err)
-		return c.String(http.StatusInternalServerError, "error in reading the request body")
-	}
-	//fmt.Printf("the raw json request is %s\n", b)
-	err = json.Unmarshal(b, &u)
-	if err != nil {
-		fmt.Printf("authenticationhandlers.go::Login(): failed to unmarshal json request body: %s", err)
-		res := h.Response {
-			Status: "error",
-			Message:"Invalid request format Or required Credentials not complete",
-		}
-		return c.JSON(http.StatusBadRequest, res)
-	} */
+
 	username := s.ToLower(s.Trim(c.FormValue("username")," "))	
 	password := c.FormValue("password")
 	ipAddress := c.FormValue("ipAddress")
 	deviceAgent := c.FormValue("deviceAgent")
-	//Check for complete credentials
-	/* if u.Details.Username == "" || u.Details.Password == "" || u.Details.IpAddress == "" {
-		res := h.Response {
-			Status: "error",
-			Message:"Invalid request format Or required Credentials not complete",
-		}
-		return c.JSON(http.StatusBadRequest, res)	
-	}  */
+
 	if username == "" || password == "" || ipAddress == "" || deviceAgent == "" {
 		res := h.Response {
 			Status: "error",
@@ -210,17 +176,6 @@ func Login(c echo.Context) error {
 		Message:"Logged In Successfully",
 		Data: bs,
 	}
-	/* uDetail := UserInfo {
-		LastName: uLastName,
-		OtherName: uOtherNames,
-		UserName:username,
-	} */
-	
-	
-	/* res := UserLoginResponse {
-		dRes,
-		bs,
-	}  */
 	return c.JSON(http.StatusOK, dRes)
 }
 
@@ -232,6 +187,23 @@ func CheckHash(nonce, apiKey, apiSecret, signature string) bool {
 		return false
 	}
 	return true
+}
+
+func validateUserByUsernameAndEmail(username,email string) (bool,string) {
+	q := `SELECT "Id","Email" FROM "AspNetUsers" WHERE "Email" = $1 AND "Username" = $2`
+	userId,err := h.DBSelect(q, email,username)
+	if err != nil {
+		if err == h.NoRows {
+			return false, "User not found"
+		}
+		fmt.Println("authenticationhandlers.go::validateUserByUsernameAndEmail(): failed selecting from AspNetUsers due to ", err)	
+		return false, err.Error()
+	} 
+	if userId == nil || userId.(string) == "" {
+		fmt.Printf("authenticationhandlers.go::validateUserByUsernameAndEmail(): userId is nil for username - %s and email - %s",username,email)
+		return false, "User identifier empty"	
+	}
+	return true, userId.(string)
 }
 
 func ValidateSignature(apiKey, apiSecret, signature string) (bool, string) {
@@ -264,6 +236,7 @@ func ValidateSignature(apiKey, apiSecret, signature string) (bool, string) {
 			if status.(bool) == false{
 				return false, "Api Account yet to be Enabled"
 			}
+	
 			//fmt.Println(userId.(string))
 			return true, ""
 		}		

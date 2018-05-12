@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
+	"github.com/kenmobility/feezbot/rand"
+	e "github.com/kenmobility/feezbot/email"
 	"fmt"
 	"github.com/labstack/echo"
 	s "strings"
@@ -30,7 +32,57 @@ func verifyPassword(s string) (sevenOrMore, number, upper, special bool) {
 	}
 	sevenOrMore = letters >= 7
 	return
-  }
+}
+
+func ValidateUserExistence(c echo.Context) error {
+	username := s.ToLower(s.Trim(c.FormValue("username")," "))
+	email := s.ToLower(s.Trim(c.FormValue("email")," "))
+	if username == "" || email == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	exists,uId := validateUserByUsernameAndEmail(username, email)
+	if  !exists {
+		res := h.Response {
+			Status: "error",
+			Message:"User Account does not exist",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	//TODO: generate a 6 digit confirmation code and email to user
+	err := sendConfirmationCode(uId, email)
+	if err != nil {
+		res := h.Response {
+			Status: "success",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusOK, res)
+	}
+	res := h.Response {
+		Status: "success",
+		Message:"User Account exists",
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func ResetPassword(c echo.Context) error {
+	username := s.ToLower(s.Trim(c.FormValue("username")," "))
+	email := s.ToLower(s.Trim(c.FormValue("email")," "))
+	confirmationCode := s.ToLower(s.Trim(c.FormValue("code")," "))
+	password := c.FormValue("password")
+
+	if username == "" || email == "" || confirmationCode == "" || password == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)	
+	}
+	return c.String(http.StatusOK, "OK")
+}
 
 func CreateUser(c echo.Context) error {
 	con, err := h.OpenConnection()
@@ -44,12 +96,14 @@ func CreateUser(c echo.Context) error {
 	lastname := s.ToLower(s.Trim(c.FormValue("lastName")," "))
 	othername := s.ToLower(s.Trim(c.FormValue("otherName")," "))
 	deviceName := s.ToLower(s.Trim(c.FormValue("deviceName")," "))
-	deviceModel := s.ToLower(s.Trim(c.FormValue("deviceModel")," "))
-	deviceUuid := s.ToLower(s.Trim(c.FormValue("deviceUuid")," "))
-	deviceImei := s.ToLower(s.Trim(c.FormValue("deviceImei")," "))
+	deviceModel := s.Trim(c.FormValue("deviceModel")," ")
+	deviceUuid := s.Trim(c.FormValue("deviceUuid")," ")
+	deviceImei := s.Trim(c.FormValue("deviceImei")," ")
 	ipAddress := s.ToLower(s.Trim(c.FormValue("ipAddress")," "))
 	email := s.ToLower(s.Trim(c.FormValue("email")," "))
 	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
+	phoneVerificationStatus := c.FormValue("phoneVerificationStatus")
+
 
 	//Check for complete credentials
 	if username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
@@ -106,7 +160,7 @@ func CreateUser(c echo.Context) error {
 		username,email,lastname,phone,othername,deviceName,deviceModel,deviceUuid,deviceImei,ipAddress)
 
 	//Execute AspNetUsers insert
-	userId, err := aspNetUsersInsert(username, email, passHash, phone)
+	userId, err := aspNetUsersInsert(username, email, passHash, phone, phoneVerificationStatus)
 	if err != nil {
 		res := h.Response {
 			Status: "error",
@@ -254,17 +308,22 @@ func CreateUser(c echo.Context) error {
 	return c.JSON(http.StatusCreated, res)
 }
 
-
-func aspNetUsersInsert(username,email,passHash,phone string) (string,error) {
+func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (string,error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
 	}
 	defer con.Close()
+	var verify bool
+	if phoneVeriStatus == "1" {
+		verify = true
+	}else{
+		verify = false
+	}
 	var userid string
-	queryString := `INSERT INTO "AspNetUsers"("Id","Email","PasswordHash","SecurityStamp","PhoneNumber","UserName") VALUES($1,$2,$3,$4,$5,$6) RETURNING "Id"`
+	queryString := `INSERT INTO "AspNetUsers"("Id","Email","PasswordHash","SecurityStamp","PhoneNumber","PhoneNumberConfirmed","UserName") VALUES($1,$2,$3,$4,$5,$6) RETURNING "Id"`
 	//re, err := con.Db.Exec(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone, username)//.Scan(&userid)
-	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone, username).Scan(&userid)
+	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone,verify, username).Scan(&userid)
 	fmt.Println("userid inserted for AspNetUsers is ", userid)
 	if err != nil {
 		fmt.Println("error encountered is ", err)
@@ -512,4 +571,23 @@ func isEmailExists(email string) (bool) {
 		return false
 	}
 	return true
+}
+
+func sendConfirmationCode(userId,email string) error {	
+	con, err := h.OpenConnection()
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+	var ruId string 
+	code := s.ToLower(rand.RandStr(6, "alphanum"))
+	//TODO, send this code to the client's email
+	err = e.SendMail(email,code)
+	if err != nil {
+		fmt.Println("userhandlers.go::sendConfirmationCode():: error encountered while sending mail is ", err)
+		return err
+	}
+	q := `UPDATE "profiles" SET "ResetPasswordConfirmationCode" = $1, "CodeSentAt" = $2 WHERE userId = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(q, code,time.Now()).Scan(&ruId)
+	return err
 }
