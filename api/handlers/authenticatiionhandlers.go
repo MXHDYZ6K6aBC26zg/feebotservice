@@ -190,7 +190,7 @@ func CheckHash(nonce, apiKey, apiSecret, signature string) bool {
 }
 
 func validateUserByUsernameAndEmail(username,email string) (bool,string) {
-	q := `SELECT "Id","Email" FROM "AspNetUsers" WHERE "Email" = $1 AND "Username" = $2`
+	q := `SELECT "Id","Email" FROM "AspNetUsers" WHERE "Email" = $1 AND "UserName" = $2`
 	userId,err := h.DBSelect(q, email,username)
 	if err != nil {
 		if err == h.NoRows {

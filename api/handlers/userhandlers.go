@@ -63,7 +63,7 @@ func ValidateUserExistence(c echo.Context) error {
 	}
 	res := h.Response {
 		Status: "success",
-		Message:"User Account exists",
+		Message:"Provide the confirmation code sent to your email address to reset your password",
 	}
 	return c.JSON(http.StatusOK, res)
 }
