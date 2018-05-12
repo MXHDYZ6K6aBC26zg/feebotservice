@@ -14,7 +14,7 @@ func MobileGroup(g *echo.Group) {
 
 	//*******HANDLERS FOR FORGOTTEN PASSWORD***********//
 	g.POST("/user/validate", handlers.ValidateUserExistence)
-	
+	g.POST("/user/reset/password", handlers.ResetPassword)
 
 	//*******HANDLERS FOR TRANSACTIONS***********//
 	g.POST("/user/transaction/initiate", handlers.InitiateTransaction)
