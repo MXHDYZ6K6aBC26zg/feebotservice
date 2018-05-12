@@ -5,31 +5,11 @@ import (
 	h "github.com/kenmobility/feezbot/helper"
 	"fmt"
 	"github.com/labstack/echo"
-	"encoding/json"
-	"io/ioutil"
-	"strings"
+	s "strings"
 	"unicode"
 	"errors"
 	"time"
 )
-
-type User struct {
-	Details UserDetail `json:"createUser"`
-}
-
-type UserDetail struct {
-	Email    	string 		`json:"email"`
-	Password 	string 		`json:"password"`
-	Phone    	string 		`json:"phone"`
-	UserName 	string 		`json:"userName"`
-	LastName 	string 		`json:"lastName"`
-	OtherName 	string 		`json:"otherName"`
-	DeviceName 	string 		`json:"deviceName"`
-	DeviceModel string 		`json:"deviceModel"`
-	DeviceUUID 	string 		`json:"deviceUuid"`
-	DeviceIMEI 	string 		`json:"deviceImei"`
-	IpAddress 	string 		`json:"ipAddress"`	
-}
 
 func verifyPassword(s string) (sevenOrMore, number, upper, special bool) {
 	letters := 0
@@ -59,38 +39,20 @@ func CreateUser(c echo.Context) error {
 	}
 	defer con.Close()
 
-	var u User
-	defer c.Request().Body.Close()
-	b,err := ioutil.ReadAll(c.Request().Body)
-	if err != nil {
-		fmt.Printf("failed to read request body due to : %s", err)
-		return c.String(http.StatusInternalServerError, "error in reading the request body")
-	}
-	fmt.Printf("the raw json request is %s\n", b)
-	err = json.Unmarshal(b, &u)
-	if err != nil {
-		fmt.Printf("failed to unmarshal json request body: %s", err)
-		res := h.Response {
-			Status: "error",
-			Message:err.Error(),
-		}
-		return c.JSON(http.StatusBadRequest, res)
-	}
-	fmt.Printf("json object is : %#v\n", u)
-
-	email := strings.ToLower(u.Details.Email)
-	username := strings.ToLower(u.Details.UserName)
-	phone := strings.ToLower(u.Details.Phone)
-	lastname := strings.ToLower(u.Details.LastName)
-	othername := strings.ToLower(u.Details.OtherName)
-	deviceName := u.Details.DeviceName
-	deviceModel := u.Details.DeviceModel
-	deviceUuid := strings.ToLower(u.Details.DeviceUUID)
-	deviceImei := strings.ToLower(u.Details.DeviceIMEI)
-	ipAddress := strings.ToLower(u.Details.IpAddress)
+	username := s.ToLower(s.Trim(c.FormValue("username")," "))	
+	password := c.FormValue("password")
+	lastname := s.ToLower(s.Trim(c.FormValue("lastName")," "))
+	othername := s.ToLower(s.Trim(c.FormValue("otherName")," "))
+	deviceName := s.ToLower(s.Trim(c.FormValue("deviceName")," "))
+	deviceModel := s.ToLower(s.Trim(c.FormValue("deviceModel")," "))
+	deviceUuid := s.ToLower(s.Trim(c.FormValue("deviceUuid")," "))
+	deviceImei := s.ToLower(s.Trim(c.FormValue("deviceImei")," "))
+	ipAddress := s.ToLower(s.Trim(c.FormValue("ipAddress")," "))
+	email := s.ToLower(s.Trim(c.FormValue("email")," "))
+	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
 
 	//Check for complete credentials
-	if username == "" || u.Details.Password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" {
+	if username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
 		res := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required Credentials not complete",
@@ -106,7 +68,7 @@ func CreateUser(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, res)
 	}
 
-	numComplete,numPresent,upperPresent,specialChar := verifyPassword(u.Details.Password)
+	numComplete,numPresent,upperPresent,specialChar := verifyPassword(password)
 	if !numComplete {
 		res := h.Response {
 			Status: "error",
@@ -136,8 +98,7 @@ func CreateUser(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, res)
 	}
 
-	//passHash,err := h.CreateHash(u.Details.Password)
-	passHash,err := h.BcryptHashPassword(u.Details.Password)
+	passHash,err := h.BcryptHashPassword(password)
 	if err != nil {
 		fmt.Println("error in hashing password due to :", err)
 	}
@@ -321,7 +282,7 @@ func aspNetUsersInsert(username,email,passHash,phone string) (string,error) {
 			}
 			return c.JSON(http.StatusInternalServerError, res)
 		} */
-		if strings.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_UserName_key"`) {
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_UserName_key"`) {
 			return "",errors.New("Username already Exists")
 		}
 		return "", err
