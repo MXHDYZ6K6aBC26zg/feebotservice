@@ -54,7 +54,7 @@ func ShowMerchantsSummary(c echo.Context) error {
 	merchant := make([]merchantInfo,0)
 	var id,title,description,photo interface{}
 	var mId,mTitle,mDescription,mPhoto string
-	q := `SELECT "Id","Title","Description","PhotoId" FROM "merchants" WHERE "Enabled" = $1 AND "CategoriesId" = $2`
+	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Description","photos"."NormalImage" FROM "merchants" INNER JOIN "photos" ON "photos"."Id" = "merchants"."PhotoId" WHERE "merchants"."Enabled" = $1 AND "CategoriesId" = $2`
 	mRows,err := con.Db.Query(q,true, categoriesId)
 	defer mRows.Close()
 	if err != nil{
