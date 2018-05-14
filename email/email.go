@@ -7,9 +7,9 @@ import (
 )
 
 func SendMail(recipient,message string) error {
-	subject := "FeeRack Reset Passwork Confirmation Code"
+	subject := "test Reset Passwork Confirmation Code"
 	m := gomail.NewMessage()
-	m.SetHeader("From", "feeracksolution@gmail.com")
+	m.SetHeader("From", "ipaytsa1@gmail.com")
 	//m.SetHeader("To", "nduson2k@gmail.com")
 	m.SetHeader("To", recipient)
 	//m.SetHeader("Subject", "Testing Mail From Golang!")
@@ -18,7 +18,7 @@ func SendMail(recipient,message string) error {
 	m.SetBody("text/plain", message)
 
 	// Send the email to Bob
-	d := gomail.NewDialer("smtp.gmail.com", 587, "feeracksolution@gmail.com", "password1@")
+	d := gomail.NewDialer("smtp.gmail.com", 587, "ipaytsa1@gmail.com", "ikechukwu")
 	if err := d.DialAndSend(m); err != nil {
 		fmt.Println("email.go:sendmail: Sending mail to", recipient, " Faild Due to", err)
 		return err
