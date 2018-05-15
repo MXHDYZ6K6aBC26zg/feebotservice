@@ -99,7 +99,7 @@ func ResetPassword(c echo.Context) error {
 	}
 	now := time.Now()
 	diff := now.Sub(timeSent)
-	if mins := int(diff.Minutes()); mins > 600 {
+	if mins := int(diff.Minutes()); mins > 10 {
 		res := h.Response {
 			Status: "error",
 			Message:"Sorry!!...Confirmation code has expired!",
