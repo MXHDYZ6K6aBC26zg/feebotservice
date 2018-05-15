@@ -19,6 +19,7 @@ type merchantInfo struct {
 	Title 			string 		`json:"title"`
 	Description    	string 		`json:"description"`
 	Photo 			string 		`json:"photo"`
+	TotalFees		int			`json:"total_fees"`
 }
 
 type merchantFees struct {
@@ -54,7 +55,8 @@ func ShowMerchantsSummary(c echo.Context) error {
 	merchant := make([]merchantInfo,0)
 	var id,title,description,photo interface{}
 	var mId,mTitle,mDescription,mPhoto string
-	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Description","photos"."NormalImage" FROM "merchants" INNER JOIN "photos" ON "photos"."Id" = "merchants"."PhotoId" WHERE "merchants"."Enabled" = $1 AND "CategoriesId" = $2`
+	var totalFees int
+	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Description","photos"."NormalImage", merchant_fees_count("merchants"."Id") FROM "merchants" INNER JOIN "photos" ON "photos"."Id" = "merchants"."PhotoId" WHERE "merchants"."Enabled" = $1 AND "CategoriesId" = $2`
 	mRows,err := con.Db.Query(q,true, categoriesId)
 	defer mRows.Close()
 	if err != nil{
@@ -70,7 +72,7 @@ func ShowMerchantsSummary(c echo.Context) error {
 		}
 	}
 	for mRows.Next() {
-		err = mRows.Scan(&id,&title,&description,&photo)
+		err = mRows.Scan(&id,&title,&description,&photo,&totalFees)
 		if err != nil {
 			fmt.Println("merchanthandlers.go::ShowMerchantSummary()::scanning merchants columns Failed due to:", err)
 		}
@@ -91,6 +93,7 @@ func ShowMerchantsSummary(c echo.Context) error {
 			Title : mTitle,
 			Description: mDescription,
 			Photo : mPhoto,
+			TotalFees: totalFees,
 		}
 		merchant = append(merchant, m)
 	}
