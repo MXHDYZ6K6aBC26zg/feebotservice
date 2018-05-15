@@ -56,7 +56,7 @@ func ValidateUserExistence(c echo.Context) error {
 	err := sendConfirmationCode(uId, email)
 	if err != nil {
 		res := h.Response {
-			Status: "success",
+			Status: "error",
 			Message:err.Error(),
 		}
 		return c.JSON(http.StatusOK, res)
@@ -71,7 +71,7 @@ func ValidateUserExistence(c echo.Context) error {
 func ResetPassword(c echo.Context) error {
 	username := s.ToLower(s.Trim(c.FormValue("username")," "))
 	email := s.ToLower(s.Trim(c.FormValue("email")," "))
-	confirmationCode := s.ToLower(s.Trim(c.FormValue("code")," "))
+	confirmationCode := s.ToUpper(s.Trim(c.FormValue("code")," "))
 	password := c.FormValue("password")
 
 	if username == "" || email == "" || confirmationCode == "" || password == "" {
@@ -81,7 +81,102 @@ func ResetPassword(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
-	return c.String(http.StatusOK, "OK")
+	exists,uId := validateUserByUsernameAndEmail(username, email)
+	if  !exists {
+		res := h.Response {
+			Status: "error",
+			Message:"User Account does not exist",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	codeSent,timeSent,resetCount := getConfrimationCodeAndTimeSent(uId)
+	if codeSent != confirmationCode {
+		res := h.Response {
+			Status: "error",
+			Message:"Confirmation code is invalid!",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	now := time.Now()
+	diff := now.Sub(timeSent)
+	if mins := int(diff.Minutes()); mins > 600 {
+		res := h.Response {
+			Status: "error",
+			Message:"Sorry!!...Confirmation code has expired!",
+		}
+		return c.JSON(http.StatusRequestTimeout, res)
+	}
+	passHash,err := h.BcryptHashPassword(password)
+	if err != nil {
+		fmt.Println("userhandlers.go::ResetPassword():: error in hashing provided password due to:", err)
+		res := h.Response {
+			Status: "error",
+			Message:"Oops, something went wrong please try again",
+		}
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	err = updatePassword(uId, passHash, resetCount)
+	if err != nil {
+		fmt.Println("userhandlers.go::ResetPassword():: error in updating hashed password due to:", err)
+		res := h.Response {
+			Status: "error",
+			Message:"Oops, something went wrong please try again",
+		}
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	res := h.Response {
+		Status: "success",
+		Message:"Password Reset Successful",
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func getConfrimationCodeAndTimeSent(userId string) (string, time.Time,int) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::getConfrimationCodeAndTimeSent():: error in connectiong to database due to :", err)
+		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	var iConfCode, iTimeSent interface{}
+	var code string 
+	var timeSent time.Time
+	var resetCount int
+	q := `SELECT "ResetPasswordConfirmationCode", "ResetPasswordCount", "CodeSentAt" FROM "profiles" WHERE "UserId" = $1`
+	err = con.Db.QueryRow(q, userId).Scan(&iConfCode,&resetCount,&iTimeSent)
+	if err != nil {
+		fmt.Println("userhandlers.go::getConfrimationCodeAndTimeSent():: error in select from profiles table due to :", err)
+	}
+	if iConfCode != nil {
+		code = iConfCode.(string)
+	}
+	if iTimeSent != nil {
+		timeSent = iTimeSent.(time.Time)
+	}
+	return code,timeSent,resetCount
+}
+
+func updatePassword(userId,hashedPassword string, resetCount int) error {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::updatePassword():: error in connecting to database due to :", err)
+		return err
+	}
+	defer con.Close()
+	var uId string
+	q := `UPDATE "AspNetUsers" SET "PasswordHash" = $1 WHERE "Id" = $2 RETURNING "Id"`
+	err = con.Db.QueryRow(q, hashedPassword, userId).Scan(&uId)
+	if err != nil {
+		fmt.Println("userhandlers.go::updatePassword():: error in updating PasswordHash of AspNetUsers table due to :", err)
+		return err
+	}
+	pq := `UPDATE "profiles" SET "ResetPasswordCount" = $1 WHERE "UserId" = $2 RETURNING "UserId"`
+	err = con.Db.QueryRow(pq, resetCount + 1, userId).Scan(&uId)
+	if err != nil {
+		fmt.Println("userhandlers.go::updatePassword():: error in updating ResetPasswordCount of profiles table due to :", err)
+		return err
+	}
+	return nil
 }
 
 func CreateUser(c echo.Context) error {
@@ -103,7 +198,6 @@ func CreateUser(c echo.Context) error {
 	email := s.ToLower(s.Trim(c.FormValue("email")," "))
 	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
 	phoneVerificationStatus := c.FormValue("phoneVerificationStatus")
-
 
 	//Check for complete credentials
 	if othername == "" || lastname == "" || username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
@@ -580,14 +674,20 @@ func sendConfirmationCode(userId,email string) error {
 	}
 	defer con.Close()
 	var ruId string 
-	code := s.ToLower(rand.RandStr(6, "alphanum"))
-	//TODO, send this code to the client's email
-	err = e.SendMail(email,code)
+	code := s.ToUpper(rand.RandStr(6, "alphanum"))
+	fmt.Println("code to be emailed to user is :", code)
+	msgBody := fmt.Sprintf(`You have requested to reset your FeeRack App Login password, Enter the confirmation code below within 2 hours as 
+	the code expires after 2 hours from the time recieved. Ignore if you didn't make this request.\n %s`,code)
+	//send this code to the user's email
+	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, "FeeRack Reset Password Confirmation code", msgBody)
+	err = e.SendMail(mailObj)
 	if err != nil {
 		fmt.Println("userhandlers.go::sendConfirmationCode():: error encountered while sending mail is ", err)
 		return err
 	}
-	q := `UPDATE "profiles" SET "ResetPasswordConfirmationCode" = $1, "CodeSentAt" = $2 WHERE userId = $3 RETURNING "Id"`
-	err = con.Db.QueryRow(q, code,time.Now()).Scan(&ruId)
+	//update the sent code to the user's profile table on the db
+	q := `UPDATE "profiles" SET "ResetPasswordConfirmationCode" = $1, "CodeSentAt" = $2 WHERE "UserId" = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(q, code,time.Now(),userId).Scan(&ruId)
+	fmt.Println("user id that just reset mail is :", ruId)
 	return err
 }

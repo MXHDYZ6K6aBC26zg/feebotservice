@@ -341,4 +341,5 @@ func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) 
 		return "", errors.New("inserting into payment_transactions failed")
 	}
 	return insertedTxId, nil
+	
 }
