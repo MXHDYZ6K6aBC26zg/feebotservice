@@ -106,7 +106,7 @@ func CreateUser(c echo.Context) error {
 
 
 	//Check for complete credentials
-	if username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
+	if othername == "" || lastname == "" || username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
 		res := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required Credentials not complete",
