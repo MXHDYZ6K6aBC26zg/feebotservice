@@ -321,7 +321,7 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 		verify = false
 	}
 	var userid string
-	queryString := `INSERT INTO "AspNetUsers"("Id","Email","PasswordHash","SecurityStamp","PhoneNumber","PhoneNumberConfirmed","UserName") VALUES($1,$2,$3,$4,$5,$6) RETURNING "Id"`
+	queryString := `INSERT INTO "AspNetUsers"("Id","Email","PasswordHash","SecurityStamp","PhoneNumber","PhoneNumberConfirmed","UserName") VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
 	//re, err := con.Db.Exec(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone, username)//.Scan(&userid)
 	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone,verify, username).Scan(&userid)
 	fmt.Println("userid inserted for AspNetUsers is ", userid)
