@@ -17,16 +17,13 @@ type merchantsSummary struct {
 type merchantInfo struct {
 	MerchantID    	string 		`json:"merchant_id"`
 	Title 			string 		`json:"title"`
+	MerchantCode  	string 		`json:"merchant_code"`
 	Description    	string 		`json:"description"`
 	Photo 			string 		`json:"photo"`
 	TotalFees		int			`json:"total_fees"`
 }
 
 type merchantFees struct {
-	MerchantCode  string `json:"merchant_code"`
-	MerchantID    string `json:"merchant_id"`
-	MerchantPhoto string `json:"merchant_photo"`
-	MerchantTitle string `json:"merchant_title"`
 	Fees []fees `json:"merchant_fees"`		
 }
 
@@ -53,10 +50,10 @@ func ShowMerchantsSummary(c echo.Context) error {
 	defer con.Close()
 
 	merchant := make([]merchantInfo,0)
-	var id,title,description,photo interface{}
-	var mId,mTitle,mDescription,mPhoto string
+	var id,title,description,photo,imCode interface{}
+	var mId,mTitle,mDescription,mPhoto,smCode string
 	var totalFees int
-	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Description","photos"."NormalImage", merchant_fees_count("merchants"."Id") FROM "merchants" INNER JOIN "photos" ON "photos"."Id" = "merchants"."PhotoId" WHERE "merchants"."Enabled" = $1 AND "CategoriesId" = $2`
+	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Code","merchants"."Description","photos"."NormalImage", merchant_fees_count("merchants"."Id") FROM "merchants" INNER JOIN "photos" ON "photos"."Id" = "merchants"."PhotoId" WHERE "merchants"."Enabled" = $1 AND "CategoriesId" = $2`
 	mRows,err := con.Db.Query(q,true, categoriesId)
 	defer mRows.Close()
 	if err != nil{
@@ -72,7 +69,7 @@ func ShowMerchantsSummary(c echo.Context) error {
 		}
 	}
 	for mRows.Next() {
-		err = mRows.Scan(&id,&title,&description,&photo,&totalFees)
+		err = mRows.Scan(&id,&title,&imCode,&description,&photo,&totalFees)
 		if err != nil {
 			fmt.Println("merchanthandlers.go::ShowMerchantSummary()::scanning merchants columns Failed due to:", err)
 		}
@@ -81,6 +78,9 @@ func ShowMerchantsSummary(c echo.Context) error {
 		}
 		if title != nil {
 			mTitle = title.(string)
+		}
+		if imCode != nil {
+			smCode = imCode.(string)
 		}
 		if description != nil {
 			mDescription = description.(string)
@@ -91,6 +91,7 @@ func ShowMerchantsSummary(c echo.Context) error {
 		m := merchantInfo {
 			MerchantID: mId,
 			Title : mTitle,
+			MerchantCode: smCode,
 			Description: mDescription,
 			Photo : mPhoto,
 			TotalFees: totalFees,
@@ -118,16 +119,15 @@ func ShowMerchantFees(c echo.Context) error {
 	}
 	defer con.Close()
 	feesSlice := make([]fees,0)
-	var imId,imTitle,imCode,imPhoto,ifTitle,ifType,imfId,imfAmount,installmentEnabled,howManyInstallment,feeBearer,firstInstPerc,imerchFeesId interface{}
-	var smId,smTitle,smCode,smPhoto,sfTitle,sfType,sfId,merchfeeBearer,smerchFeesId string 
+	var ifTitle,ifType,imfId,imfAmount,installmentEnabled,howManyInstallment,feeBearer,firstInstPerc,imerchFeesId interface{}
+	var sfTitle,sfType,sfId,merchfeeBearer,smerchFeesId string 
 	var enabledInstallment bool
 	var numberOfInstallment int64
 	var mfAmount,firstInstallmentPerc float64
 
-	q := `SELECT "merchants"."Id","merchants"."Title","merchants"."Code","merchants"."PhotoId","fees"."Title","fees"."Type","merchant_fees"."Id",
-	"merchant_fees"."FeeId","merchant_fees"."Amount","merchant_fees"."EnabledForInstallment","merchant_fees"."HowManyInstallment",
-	"merchant_fees"."FeeBearer","merchant_fees"."FirstInstallmentPercentage" FROM "merchants" INNER JOIN "merchant_fees" ON "merchant_fees"."MerchantId" = "merchants"."Id" INNER JOIN "fees" ON 
-	 "merchant_fees"."FeeId" = "fees"."Id" WHERE "merchants"."Id" = $1 AND "merchant_fees"."Enabled" = $2`
+	q := `SELECT "merchant_fees"."Id","merchant_fees"."FeeId","merchant_fees"."Amount","merchant_fees"."EnabledForInstallment","merchant_fees"."HowManyInstallment",
+	"merchant_fees"."FeeBearer","merchant_fees"."FirstInstallmentPercentage","fees"."Title","fees"."Type" FROM "merchant_fees" INNER JOIN "fees" ON 
+	"merchant_fees"."FeeId" = "fees"."Id" WHERE "merchant_fees"."MerchantId" = $1 AND "merchant_fees"."Enabled" = $2`
 
 	mFeeRows,err := con.Db.Query(q,merchantId,true)
 	defer mFeeRows.Close()
@@ -144,22 +144,11 @@ func ShowMerchantFees(c echo.Context) error {
 		}
 	}
 	for mFeeRows.Next() {
-		err = mFeeRows.Scan(&imId,&imTitle,&imCode,&imPhoto,&ifTitle,&ifType,&imerchFeesId,&imfId,&mfAmount,&installmentEnabled,&howManyInstallment,&feeBearer,&firstInstPerc)
+		err = mFeeRows.Scan(&imerchFeesId,&imfId,&mfAmount,&installmentEnabled,&howManyInstallment,&feeBearer,&firstInstPerc,&ifTitle,&ifType)
 		if err != nil {
 			fmt.Println("merchanthandlers.go::ShowMerchantFees()::scanning query Failed due to:", err)
 		}
-		if imId != nil {
-			smId = imId.(string)
-		}
-		if imTitle != nil {
-			smTitle = imTitle.(string)
-		}
-		if imCode != nil {
-			smCode = imCode.(string)
-		}
-		if imPhoto != nil {
-			smPhoto = imPhoto.(string)
-		}
+	
 		if ifTitle != nil {
 			sfTitle = ifTitle.(string)
 		}
@@ -203,14 +192,9 @@ func ShowMerchantFees(c echo.Context) error {
 			MerchantFeeId: smerchFeesId,
 			FeeBearer: merchfeeBearer,
 		}
-
 		feesSlice = append(feesSlice,feeRes)
 	}
 	ms := merchantFees {
-		MerchantID: smId,
-		MerchantCode: smCode,
-		MerchantPhoto: smPhoto,
-		MerchantTitle: smTitle,
 		Fees: feesSlice,
 	}
 	bs,_:= json.Marshal(ms)
