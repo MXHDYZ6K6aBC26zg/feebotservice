@@ -135,7 +135,6 @@ func getConfrimationCodeAndTimeSent(userId string) (string, time.Time,int) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		fmt.Println("userhandlers.go::getConfrimationCodeAndTimeSent():: error in connectiong to database due to :", err)
-		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
 	var iConfCode, iTimeSent interface{}
@@ -179,13 +178,50 @@ func updatePassword(userId,hashedPassword string, resetCount int) error {
 	return nil
 }
 
-func CreateUser(c echo.Context) error {
+func UpdateVerifiedPhoneNumber(c echo.Context) error {
+	username := s.ToLower(s.Trim(c.FormValue("username")," "))
+	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
+
+	if username == "" || phone == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+
 	con, err := h.OpenConnection()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
 
+	var userid string
+	q := `UPDATE "AspNetUsers" SET "PhoneNumber" = $1, "PhoneNumberConfirmed" = $2 WHERE "UserName" = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(q,phone,true,username).Scan(&userid)	
+	if err != nil {
+		fmt.Println("error encountered is ", err)
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_PhoneNumber_key"`) {
+			res := h.Response {
+				Status: "error",
+				Message: "Sorry...the phone number you verified is already in use by another user, please provide another phone number",
+			}
+			return c.JSON(http.StatusBadRequest, res)
+		}
+		res := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	res := h.Response {
+		Status: "success",
+		Message:"Phone number verification done successfully",
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func CreateUser(c echo.Context) error {
 	username := s.ToLower(s.Trim(c.FormValue("username")," "))	
 	password := c.FormValue("password")
 	lastname := s.ToLower(s.Trim(c.FormValue("lastName")," "))
@@ -208,10 +244,24 @@ func CreateUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)	
 	}
 
+	con, err := h.OpenConnection()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+
 	if emailStatus := isEmailExists(email); emailStatus {
 		res := h.Response {
 			Status: "error",
 			Message:"Email address already exist, register with another email address",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
+
+	if phoneStatus := isPhoneExists(phone); phoneStatus {
+		res := h.Response {
+			Status: "error",
+			Message:"Phone number already exist, register with another phone number",
 		}
 		return c.JSON(http.StatusForbidden, res)
 	}
@@ -250,8 +300,8 @@ func CreateUser(c echo.Context) error {
 	if err != nil {
 		fmt.Println("error in hashing password due to :", err)
 	}
-	fmt.Printf("Body: username-%s, email-%s, lastname-%s,phone-%s,othername-%s,deviceName-%s,deviceModel-%s,deviceUuid-%s,deviceImei-%s,ipAddress-%s\n", 
-		username,email,lastname,phone,othername,deviceName,deviceModel,deviceUuid,deviceImei,ipAddress)
+	//fmt.Printf("Body: username-%s, email-%s, lastname-%s,phone-%s,othername-%s,deviceName-%s,deviceModel-%s,deviceUuid-%s,deviceImei-%s,ipAddress-%s\n", 
+	//	username,email,lastname,phone,othername,deviceName,deviceModel,deviceUuid,deviceImei,ipAddress)
 
 	//Execute AspNetUsers insert
 	userId, err := aspNetUsersInsert(username, email, passHash, phone, phoneVerificationStatus)
@@ -270,7 +320,7 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	//fmt.Println("AspNetUsers id is ", userId)
+	fmt.Println("AspNetUsers id is ", userId)
 
 	//fetch User RoleId
 	var uRoleId string
@@ -395,9 +445,11 @@ func CreateUser(c echo.Context) error {
 	}
 	fmt.Println("user_audits id ", userAuditId)
 
+	//TODO: Send the user a confirmation code to inorder to confirm the email address registered
+
 	res := h.Response {
 		Status: "success",
-		Message:"User creation successful, congratulations",
+		Message:"You have successfully registered, a confirmation code has been sent to your email address",
 	}
 	return c.JSON(http.StatusCreated, res)
 }
@@ -421,20 +473,12 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 	fmt.Println("userid inserted for AspNetUsers is ", userid)
 	if err != nil {
 		fmt.Println("error encountered is ", err)
-		/* if strings.Contains(err.Error(),`pq: duplicate key value violates unique constraint "email_unique"`) {
-			res := h.Response {
-				Error: false,
-				Message:"Email Address already Exists",
-			}
-			return c.JSON(http.StatusInternalServerError, res)
-		} */
-		/* if strings.Contains(err.Error(),`pq: duplicate key value violates unique constraint "phone_unique"`) {
-			res := h.Response {
-				Error: false,
-				Message:"Phone Number already Exists",
-			}
-			return c.JSON(http.StatusInternalServerError, res)
-		} */
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_Email_key"`) {
+			return "",errors.New("Email Address already Exists")		
+		}
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_PhoneNumber_key"`) {
+			return "",errors.New("Phone Number already Exists")
+		}
 		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_UserName_key"`) {
 			return "",errors.New("Username already Exists")
 		}
@@ -662,6 +706,26 @@ func isEmailExists(email string) (bool) {
 		return false
 	}
 	if existingEmail == nil {
+		return false
+	}
+	return true
+}
+
+func isPhoneExists(phone string) (bool) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::isPhoneExists()::error in connecting to database due to ",err)
+		return false
+	}
+	defer con.Close()
+	var existingPhone interface{}
+	q := `SELECT "AspNetUsers"."PhoneNumber" FROM "AspNetUsers" WHERE "PhoneNumber" = $1` 
+	err = con.Db.QueryRow(q, phone).Scan(&existingPhone)
+	if err != nil {
+		fmt.Println("userhandlers.go::isPhoneExists()::error in fetching phone number status from database due to ",err)
+		return false
+	}
+	if existingPhone == nil {
 		return false
 	}
 	return true
