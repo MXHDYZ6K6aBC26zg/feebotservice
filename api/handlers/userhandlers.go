@@ -180,10 +180,11 @@ func updatePassword(userId,hashedPassword string, resetCount int) error {
 }
 
 func UpdateVerifiedPhoneNumber(c echo.Context) error {
-	username := s.ToLower(s.Trim(c.FormValue("username")," "))
+	userId := s.ToLower(s.Trim(c.FormValue("userId")," "))
 	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
+	phoneVerificationId := c.FormValue("phoneVerificationId")
 
-	if username == "" || phone == "" {
+	if userId == "" || phone == "" {
 		res := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required Credentials not complete",
@@ -197,9 +198,9 @@ func UpdateVerifiedPhoneNumber(c echo.Context) error {
 	}
 	defer con.Close()
 
-	var userid string
-	q := `UPDATE "AspNetUsers" SET "PhoneNumber" = $1, "PhoneNumberConfirmed" = $2 WHERE "UserName" = $3 RETURNING "Id"`
-	err = con.Db.QueryRow(q,phone,true,username).Scan(&userid)	
+	var userid,profilesId string
+	q := `UPDATE "AspNetUsers" SET "PhoneNumber" = $1, "PhoneNumberConfirmed" = $2 WHERE "Id" = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(q,phone,true,userId).Scan(&userid)	
 	if err != nil {
 		fmt.Println("error encountered is ", err)
 		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_PhoneNumber_key"`) {
@@ -214,6 +215,15 @@ func UpdateVerifiedPhoneNumber(c echo.Context) error {
 			Message:err.Error(),
 		}
 		return c.JSON(http.StatusBadRequest, res)
+	}
+	pq := `UPDATE "profiles" SET "PhoneNumberVerificationId" = $1 WHERE "UserId" = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(pq,phoneVerificationId,userId).Scan(&profilesId)	
+	if err != nil {
+		res := h.Response {
+			Status: "error",
+			Message: err.Error(),//"Error encountered, please try again",
+		}
+		return c.JSON(http.StatusInternalServerError, res)
 	}
 	res := h.Response {
 		Status: "success",
@@ -235,6 +245,7 @@ func CreateUser(c echo.Context) error {
 	email := s.ToLower(s.Trim(c.FormValue("email")," "))
 	phone := s.ToLower(s.Trim(c.FormValue("phone")," "))
 	phoneVerificationStatus := c.FormValue("phoneVerificationStatus")
+	phoneVerificationId := c.FormValue("phoneVerificationId")
 
 	//Check for complete credentials
 	if othername == "" || lastname == "" || username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
@@ -244,7 +255,14 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
-
+	if phoneVerificationStatus == "1" && phoneVerificationId == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Phone number is verified, expecting phone number verification id",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
@@ -387,7 +405,7 @@ func CreateUser(c echo.Context) error {
 	fmt.Println("data records id is ", dataRecordId)
 
 	//Execute profiles table insert 
-	profilesId, err := profilesInsert(userId,lastname,othername,dataRecordId)
+	profilesId, err := profilesInsert(userId,lastname,othername,dataRecordId,phoneVerificationId)
 	if err != nil {
 		fmt.Println("inserting into profiles table failed due to ", err)
 		affRows1, _ := aspNetUsersDelete(userId)
@@ -446,7 +464,8 @@ func CreateUser(c echo.Context) error {
 	}
 	fmt.Println("user_audits id ", userAuditId)
 
-	//TODO: Send the user a confirmation code to inorder to confirm the email address registered
+	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
+
 	uDetail := map[string]string {
 		"user_id": userId,
 	}
@@ -575,15 +594,15 @@ func dataRecordsDelete(id string) (int64, error) {
 	return affRows,nil
 }
 
-func profilesInsert(userId,lastName,otherName,dataRecordId string) (string, error) {
+func profilesInsert(userId,lastName,otherName,dataRecordId,phoneVerificationId string) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
 	}
 	defer con.Close()
 	var insertedId string
-	insertQuery := `INSERT INTO "profiles"("Id","UserId","LastName","OtherNames","DataRecordId") VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,lastName,otherName,dataRecordId).Scan(&insertedId)
+	insertQuery := `INSERT INTO "profiles"("Id","UserId","LastName","OtherNames","DataRecordId","PhoneNumberVerificationId") VALUES($1,$2,$3,$4,$5,$6) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,lastName,otherName,dataRecordId,phoneVerificationId).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into profiles table due to ", err)
 		return "",err
