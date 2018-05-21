@@ -11,6 +11,7 @@ import (
 	"unicode"
 	"errors"
 	"time"
+	"encoding/json"
 )
 
 func verifyPassword(s string) (sevenOrMore, number, upper, special bool) {
@@ -446,10 +447,15 @@ func CreateUser(c echo.Context) error {
 	fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to inorder to confirm the email address registered
+	uDetail := map[string]string {
+		"user_id": userId,
+	}
+	bs,_:= json.Marshal(uDetail)
 
 	res := h.Response {
 		Status: "success",
 		Message:"You have successfully registered, a confirmation code has been sent to your email address",
+		Data: bs,
 	}
 	return c.JSON(http.StatusCreated, res)
 }
