@@ -216,7 +216,7 @@ func UpdateVerifiedPhoneNumber(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)
 	}
-	pq := `UPDATE "profiles" SET "PhoneNumberVerificationId" = $1 WHERE "UserId" = $3 RETURNING "Id"`
+	pq := `UPDATE "profiles" SET "PhoneNumberVerificationId" = $1 WHERE "UserId" = $2 RETURNING "Id"`
 	err = con.Db.QueryRow(pq,phoneVerificationId,userId).Scan(&profilesId)	
 	if err != nil {
 		res := h.Response {
