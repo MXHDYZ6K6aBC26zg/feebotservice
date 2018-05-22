@@ -379,7 +379,7 @@ func CreateUser(c echo.Context) error {
 		fmt.Println("User creation unsuccessful due to ", err)
 		res := h.Response {
 			Status: "error",
-			Message:"User creation unsuccessful, pls try again",
+			Message: err.Error(),//"User creation unsuccessful, pls try again",
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
@@ -398,7 +398,7 @@ func CreateUser(c echo.Context) error {
 		fmt.Println("User creation unsuccessful due to ", err)
 		res := h.Response {
 			Status: "error",
-			Message:"User creation unsuccessful, pls try again",
+			Message: err.Error(),//"User creation unsuccessful, pls try again",
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
@@ -417,7 +417,7 @@ func CreateUser(c echo.Context) error {
 		fmt.Println("User creation unsuccessful due to ", err)
 		res := h.Response {
 			Status: "error",
-			Message:"User creation unsuccessful, pls try again",
+			Message: err.Error(),//"User creation unsuccessful, pls try again",
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
@@ -437,7 +437,7 @@ func CreateUser(c echo.Context) error {
 		fmt.Println("User creation unsuccessful due to ", err)
 		res := h.Response {
 			Status: "error",
-			Message:"User creation unsuccessful, pls try again",
+			Message: err.Error(),//"User creation unsuccessful, pls try again",
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
@@ -458,7 +458,7 @@ func CreateUser(c echo.Context) error {
 		fmt.Println("User creation unsuccessful due to ", err)
 			res := h.Response {
 				Status: "error",
-				Message:"User creation unsuccessful, pls try again",
+				Message: err.Error(),//"User creation unsuccessful, pls try again",
 			}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
