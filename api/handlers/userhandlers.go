@@ -667,7 +667,13 @@ func userDevicesInsert(userId,deviceName,deviceModel,deviceUuid,deviceImei,dataR
 	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,deviceName,deviceModel,deviceUuid,deviceImei,dataRecordId).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into user_devices table due to ", err)
-		return "",err
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceUUID_key"`) {
+			return "",errors.New("'the device has been used to create account before. Please contact admin")		
+		}
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceIMEI_key"`) {
+			return "",errors.New("'the device has been used to create account before. Please contact admin")
+		}
+		return "", err
 	}
 	return insertedId, nil
 }
