@@ -225,9 +225,14 @@ func UpdateVerifiedPhoneNumber(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
+	uPhone := map[string]string {
+		"phone_number" : phone,
+	}
+	bs,_:= json.Marshal(uPhone)
 	res := h.Response {
 		Status: "success",
-		Message:"Phone number verification done successfully",
+		Message: "Phone number verification done successfully",
+		Data: bs,
 	}
 	return c.JSON(http.StatusOK, res)
 }
@@ -255,6 +260,15 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
+
+	if isDeviceEnabled := isDeviceEnabled(deviceUuid,deviceImei); !isDeviceEnabled {
+		res := h.Response {
+			Status: "error",
+			Message: "This Device is been disabled, contact admin",
+		}
+		return c.JSON(http.StatusLocked, res)
+	}
+
 	if phoneVerificationStatus == "1" && phoneVerificationId == "" {
 		res := h.Response {
 			Status: "error",
@@ -526,7 +540,7 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 	var userid string
 	queryString := `INSERT INTO "AspNetUsers"("Id","Email","PasswordHash","SecurityStamp","PhoneNumber","PhoneNumberConfirmed","UserName") VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
 	//re, err := con.Db.Exec(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone, username)//.Scan(&userid)
-	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone,verify, username).Scan(&userid)
+	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash,h.GenerateUuid(),phone,verify, username).Scan(&userid)
 	fmt.Println("userid inserted for AspNetUsers is ", userid)
 	if err != nil {
 		fmt.Println("error encountered while inserting for AspNetUsers is ", err)
@@ -761,6 +775,23 @@ func isEmailConfirmed(username string) (string,string,bool) {
 		return uId,uEmail,false
 	}
 	return uId,uEmail,true
+}
+
+func isDeviceEnabled(uuid,imei string) (status bool) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::isDeviceDisabled()::error in connecting to database due to ",err)
+		return false
+	}
+	defer con.Close()
+
+	q := `SELECT "user_devices"."Enabled" FROM "user_devices" WHERE "DeviceUUID" = $1 AND "DeviceIMEI" = $2` 
+	err = con.Db.QueryRow(q, uuid,imei).Scan(&status)
+	if err != nil {
+		fmt.Println("userhandlers.go::isDeviceDisabled()::error in fetching email status from database due to ",err)
+		return false
+	}
+	return status
 }
 
 func isEmailExists(email string) (bool) {
