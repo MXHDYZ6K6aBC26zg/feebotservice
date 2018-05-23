@@ -321,7 +321,38 @@ func CreateUser(c echo.Context) error {
 	}
 	//fmt.Printf("Body: username-%s, email-%s, lastname-%s,phone-%s,othername-%s,deviceName-%s,deviceModel-%s,deviceUuid-%s,deviceImei-%s,ipAddress-%s\n", 
 	//	username,email,lastname,phone,othername,deviceName,deviceModel,deviceUuid,deviceImei,ipAddress)
-
+	isNew := true 
+	fUId,count := CheckUuidCount(deviceUuid, deviceImei)
+	if count == 1 {
+		res := h.Response {
+			Status: "error",
+			Message:"This device has been used to create an account in feerack solution. Would you want to ignore and continue? To continue means that you would want to lock the existing account",
+		}
+		return c.JSON(http.StatusConflict, res)
+	}
+	if count == 2 {
+		err = lockUserAccount(fUId)
+		if err != nil {
+			fmt.Println("error encountered while trying to lock user account for count equal to 2 is ", err)
+		}
+		isNew = false
+	}
+	if count > 2 {
+		err = lockUserAccount(fUId)
+		if err != nil {
+			fmt.Println("error encountered while trying to lock user account for count greater than 2 is ", err)
+		}
+		err = disableUserDevice(deviceUuid, deviceImei)
+		if err != nil {
+			fmt.Println("error encountered while trying to disable user device for count greater than 2 is ", err)
+		}
+		res := h.Response {
+			Status: "error",
+			Message: "Device locked...multiple accounts not allowed per device, contact admin",
+		}
+		return c.JSON(http.StatusLocked, res)
+	}
+	
 	//Execute AspNetUsers insert
 	userId, err := aspNetUsersInsert(username, email, passHash, phone, phoneVerificationStatus)
 	if err != nil {
@@ -424,7 +455,7 @@ func CreateUser(c echo.Context) error {
 	fmt.Println("profiles id is ", profilesId)
 
 	//Execute user_devices table insert
-	userDevicesId, err := userDevicesInsert(userId, deviceName, deviceModel, deviceUuid, deviceImei, dataRecordId)
+	userDevicesId, err := userDevicesInsertOrUpdate(userId, deviceName, deviceModel, deviceUuid, deviceImei, dataRecordId,isNew)
 	if err != nil {
 		fmt.Println("inserting into user_devices table failed due to ", err)
 		affRows1, _ := aspNetUsersDelete(userId)
@@ -468,6 +499,7 @@ func CreateUser(c echo.Context) error {
 
 	uDetail := map[string]string {
 		"user_id": userId,
+		"phone_number" : phone,
 	}
 	bs,_:= json.Marshal(uDetail)
 
@@ -497,7 +529,7 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 	err = con.Db.QueryRow(queryString,h.GenerateUuid(),email,passHash, h.GenerateUuid(),phone,verify, username).Scan(&userid)
 	fmt.Println("userid inserted for AspNetUsers is ", userid)
 	if err != nil {
-		fmt.Println("error encountered is ", err)
+		fmt.Println("error encountered while inserting for AspNetUsers is ", err)
 		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_Email_key"`) {
 			return "",errors.New("Email Address already Exists")		
 		}
@@ -507,7 +539,7 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_UserName_key"`) {
 			return "",errors.New("Username already Exists")
 		}
-		return "", err
+		return "", errors.New("User creation unsuccessful, pls try again")
 	}
 	return userid,nil
 }
@@ -539,7 +571,7 @@ func aspNetUserRolesInsert(userId, roleId string) (string, error) {
 	err = con.Db.QueryRow(insertQuery,userId,roleId).Scan(&insertedUserId,&insertedRoleId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into AspNetUserRoles is ", err)
-		return "",err
+		return "",errors.New("User creation unsuccessful, pls try again")
 	}
 	//check if the row was inserted successfully
 	if insertedUserId == "" && insertedRoleId == "" {
@@ -574,7 +606,7 @@ func dataRecordsInsert() (string, error) {
 	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),"Self",time.Now()).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into data_records due to ", err)
-		return "",err
+		return "",errors.New("User creation unsuccessful, pls try again")
 	}
 	return insertedId, nil
 }
@@ -605,7 +637,7 @@ func profilesInsert(userId,lastName,otherName,dataRecordId,phoneVerificationId s
 	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,lastName,otherName,dataRecordId,phoneVerificationId).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into profiles table due to ", err)
-		return "",err
+		return "",errors.New("User creation unsuccessful, pls try again")
 	}
 	return insertedId, nil
 }
@@ -636,7 +668,7 @@ func userAuditsInsert(userId,ipAddress,deviceAgent,auditEvent string) (string,er
 	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,deviceAgent,ipAddress,auditEvent, time.Now()).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into profiles table due to ", err)
-		return "",err
+		return "",errors.New("User creation unsuccessful, pls try again")
 	}
 	return insertedId, nil
 } 
@@ -656,26 +688,35 @@ func userAuditsDelete(id string) (int64, error) {
 	return affRows,nil
 }
 
-func userDevicesInsert(userId,deviceName,deviceModel,deviceUuid,deviceImei,dataRecordId string) (string,error) {
+func userDevicesInsertOrUpdate(userId,deviceName,deviceModel,deviceUuid,deviceImei,dataRecordId string, isNew bool) (string,error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
 	}
 	defer con.Close()
-	var insertedId string
-	insertQuery := `INSERT INTO "user_devices"("Id","UserId","DeviceName","DeviceModel","DeviceUUID","DeviceIMEI","DataRecordId") VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,deviceName,deviceModel,deviceUuid,deviceImei,dataRecordId).Scan(&insertedId)
-	if err != nil {
-		fmt.Println("error encountered while inserting into user_devices table due to ", err)
-		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceUUID_key"`) {
-			return "",errors.New("'the device has been used to create account before. Please contact admin")		
+	var id string
+	if isNew == true {
+		insertQuery := `INSERT INTO "user_devices"("Id","UserId","DeviceName","DeviceModel","DeviceUUID","DeviceIMEI","DataRecordId") VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING "Id"`
+		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),userId,deviceName,deviceModel,deviceUuid,deviceImei,dataRecordId).Scan(&id)
+		if err != nil {
+			fmt.Println("error encountered while inserting into user_devices table due to ", err)
+			/* if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceUUID_key"`) {
+				return "",errors.New("This device has been used to create account before. Please contact admin")		
+			}
+			if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceIMEI_key"`) {
+				return "",errors.New("This device has been used to create account before. Please contact admin")
+			} */
+			return "", err//errors.New("User creation unsuccessful, pls try again")
 		}
-		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "UserDevices_DeviceIMEI_key"`) {
-			return "",errors.New("'the device has been used to create account before. Please contact admin")
+	}else {
+		updateQuery := `UPDATE "user_devices" SET "UserId" = $1, "DeviceName" = $2, "DeviceModel" = $3, "DataRecordId" = $4 WHERE "DeviceUUID" = $5 AND "DeviceIMEI" = $6 RETURNING "Id"`
+		err = con.Db.QueryRow(updateQuery,userId,deviceName,deviceModel,dataRecordId,deviceUuid,deviceImei).Scan(&id)
+		if err != nil {
+			fmt.Println("error encountered while updating into user_devices table due to ", err)
+			return "", err//errors.New("User creation unsuccessful, pls try again")
 		}
-		return "", err
-	}
-	return insertedId, nil
+	}	
+	return id, nil
 }
 
 func userDevicesDelete(id string) (int64, error) {
@@ -760,6 +801,65 @@ func isPhoneExists(phone string) (bool) {
 		return false
 	}
 	return true
+}
+
+func CheckUuidCount(uuid,imei string) (string,int) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::CheckUuidCount()::error in connecting to database due to ",err)
+		return "",-1
+	}
+	defer con.Close()
+	var count, incrementedCount int
+	var userId string
+	q := `SELECT "user_devices"."DeviceCount" FROM "user_devices" WHERE user_devices."DeviceUUID" = $1 AND user_devices."DeviceIMEI" = $2` 
+	err = con.Db.QueryRow(q, uuid,imei).Scan(&count)
+	if err != nil {
+		fmt.Println("userhandlers.go::CheckUuidCount()::error in fetching phone number status from database due to ",err)
+		return "",-1
+	}
+	incrementedCount = count + 1
+	//update user_devices table with the incremented device count
+	updateQuery := `UPDATE "user_devices" SET "DeviceCount"= $1 WHERE user_devices."DeviceUUID" = $2 AND user_devices."DeviceIMEI" = $3 RETURNING "UserId"`
+	err = con.Db.QueryRow(updateQuery, incrementedCount,uuid,imei).Scan(&userId)
+	if err != nil {
+		fmt.Println("userhandlers.go::CheckUuidCount()::user_devices.DeviceUUID update error encountered is ", err)
+		return "",-1
+	}
+	return userId,incrementedCount
+}
+
+func lockUserAccount(userId string) error {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+	//update AspNetUsers table with the incremented count
+	updateQuery := `UPDATE "AspNetUsers" SET "LockoutEnabled"= $1 WHERE "Id" = $2 RETURNING "Id"`
+	err = con.Db.QueryRow(updateQuery, true,userId).Scan(&userId)
+	if err != nil {
+		fmt.Println("userhandlers.go::lockUserAccount()::update error encountered is ", err)
+		return err
+	}
+	return nil
+}
+
+func disableUserDevice(uuid,imei string) error {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+	var id string
+	//update user_devices table and set enabled to false
+	updateQuery := `UPDATE "user_devices" SET "Enabled"= $1 WHERE "DeviceUUID" = $2 AND "DeviceIMEI" = $3 RETURNING "Id"`
+	err = con.Db.QueryRow(updateQuery, false,uuid,imei).Scan(&id)
+	if err != nil {
+		fmt.Println("userhandlers.go::disableUserDevice()::update error encountered is ", err)
+		return err
+	}
+	return nil
 }
 
 func sendConfirmationCode(userId,email string) error {	
