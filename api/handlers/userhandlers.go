@@ -785,13 +785,13 @@ func isDeviceEnabled(uuid,imei string) (bool) {
 	}
 	defer con.Close()
 	var status bool
-	q := `SELECT "user_devices"."Enabled" FROM "user_devices" WHERE "DeviceUUID" = $1 AND "DeviceIMEI" = $2 AND "UserId" = $3` 
+	q := `SELECT "user_devices"."Enabled" FROM "user_devices" WHERE "DeviceUUID" = $1 AND "DeviceIMEI" = $2` 
 	err = con.Db.QueryRow(q, uuid,imei).Scan(&status)
 	if err != nil {
 		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
 			return true	
 		}
-		fmt.Println("userhandlers.go::isDeviceDisabled()::error in fetching email status from database due to ",err)
+		fmt.Println("userhandlers.go::isDeviceDisabled()::error in fetching device enabled status from database due to ",err)
 		return true
 	}
 	return status
