@@ -264,7 +264,7 @@ func CreateUser(c echo.Context) error {
 	if isDeviceEnabled := isDeviceEnabled(deviceUuid,deviceImei); !isDeviceEnabled {
 		res := h.Response {
 			Status: "error",
-			Message: "This Device is been disabled, contact admin",
+			Message: "This Device has been disabled, contact admin",
 		}
 		return c.JSON(http.StatusLocked, res)
 	}
@@ -777,19 +777,22 @@ func isEmailConfirmed(username string) (string,string,bool) {
 	return uId,uEmail,true
 }
 
-func isDeviceEnabled(uuid,imei string) (status bool) {
+func isDeviceEnabled(uuid,imei string) (bool) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		fmt.Println("userhandlers.go::isDeviceDisabled()::error in connecting to database due to ",err)
 		return false
 	}
 	defer con.Close()
-
-	q := `SELECT "user_devices"."Enabled" FROM "user_devices" WHERE "DeviceUUID" = $1 AND "DeviceIMEI" = $2` 
+	var status bool
+	q := `SELECT "user_devices"."Enabled" FROM "user_devices" WHERE "DeviceUUID" = $1 AND "DeviceIMEI" = $2 AND "UserId" = $3` 
 	err = con.Db.QueryRow(q, uuid,imei).Scan(&status)
 	if err != nil {
+		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
+			return true	
+		}
 		fmt.Println("userhandlers.go::isDeviceDisabled()::error in fetching email status from database due to ",err)
-		return false
+		return true
 	}
 	return status
 }
