@@ -61,10 +61,10 @@ func InitiateTransaction(c echo.Context) error {
 	}
 	//Generate a unique reference for the transaction
 	reference := rand.RandStr(18, "alphanum")
-	fmt.Println("generated reference is - ", reference)
+	//fmt.Println("generated reference is - ", reference)
 
 	//Get the subaccount code for the merchant / fee 
-	subaccount,feeBearer,err := getSettlementAccount(merchantFeeId)
+	merchantName,subaccount,feeTitle,feeBearer,err := getSettlementAccount(merchantFeeId)
 	if err != nil {
 		fmt.Printf("transactionhandlers.go::InitiateTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
 		r := h.Response {
@@ -76,12 +76,12 @@ func InitiateTransaction(c echo.Context) error {
 	categoryName,_ := getCategory(categoryId) 
 
 	//TODO: call a function to insert the details of the user and the transaction into a table
-	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
+	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantName,feeTitle,paymentReferenceName,paymentReferenceId,intAmount)
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
 
-	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, paymentReferenceName,paymentReferenceId,categoryName,intAmount)
+	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, paymentReferenceName,paymentReferenceId,categoryName,merchantName,feeTitle,intAmount)
 	
 	bs,_:= json.Marshal(res)
 	r := h.Response {
@@ -270,34 +270,40 @@ func dbUpdateChargeCardResponse(userId,txReference,txStatus,txPaymentGateway,res
 	return insertedTxId, nil
 }
 
-func getSettlementAccount(merchantFeeId string) (string,string, error) {
+func getSettlementAccount(merchantFeeId string) (string,string,string,string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in connecting to database due to ",err)
-		return "","",err
+		return "","","","",err
 	}
 	defer con.Close()
-	var code,bearer interface{}
+	var code,bearer,iMerchantName,iFeeName interface{}
 	//var chargeByMerchant bool
-	var accountCode,feeBearer string 
-	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer" FROM "merchant_accounts" 
-	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "merchant_accounts"."Enabled" = $2` 
-	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer)
+	var accountCode,feeBearer,sMerchantName,sFeeName string 
+	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer","merchants"."Title", get_fee_title("merchant_fees"."FeeId") FROM "merchant_accounts" 
+	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" INNER JOIN "merchants" ON "merchants"."Id" = "merchant_accounts"."MerchantId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "merchant_accounts"."Enabled" = $2` 
+	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer,&iMerchantName,&iFeeName)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in fetching account code from database due to ",err)
 		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
-			return "","",errors.New("Sorry, selected fee is yet to be enabled")
+			return "","","","",errors.New("Sorry, selected fee is yet to be enabled")
 		}
 	}
 	if code == nil {
-		return "","",errors.New("account code for merchant/fee not yet generated")
+		return "","","","",errors.New("account code for merchant/fee not yet generated")
 	}
 	if bearer == nil {
-		return "","",errors.New("fee bearer for merchant/fee is empty")
+		return "","","","",errors.New("fee bearer for merchant/fee is empty")
+	}
+	if iMerchantName != nil {
+		sMerchantName = iMerchantName.(string)
+	}
+	if iFeeName != nil {
+		sFeeName = iFeeName.(string)
 	}
 	accountCode = code.(string)
 	feeBearer = bearer.(string)
-	return accountCode,feeBearer, nil 
+	return sMerchantName,accountCode,sFeeName,feeBearer, nil 
 }
 
 func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
