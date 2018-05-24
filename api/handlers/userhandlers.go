@@ -748,33 +748,30 @@ func userDevicesDelete(id string) (int64, error) {
 	return affRows,nil
 }
 
-func isEmailConfirmed(username string) (string,string,bool) {
+func isEmailAndPhoneConfirmed(userId string) (string,bool,bool) {
 	con, err := h.OpenConnection()
 	if err != nil {
-		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in connecting to database due to ",err)
-		return "","",false
+		fmt.Println("transactionhandlers.go::isEmailAndPhoneConfirmed()::error in connecting to database due to ",err)
+		return "",false,false
 		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
-	var id,email interface{}
-	var emailConfirmed bool 
-	var uId,uEmail string
-	q := `SELECT "AspNetUsers"."Id","AspNetUsers"."Email","AspNetUsers"."EmailConfirmed" FROM "AspNetUsers" WHERE "UserName" = $1` 
-	err = con.Db.QueryRow(q, username).Scan(&id,&email,&emailConfirmed)
+	var email interface{}
+	var emailConfirmed,phoneConfirmed bool 
+	var uEmail string
+	q := `SELECT "AspNetUsers"."Email","AspNetUsers"."EmailConfirmed","AspNetUsers"."PhoneNumberConfirmed" FROM "AspNetUsers" WHERE "Id" = $1` 
+	err = con.Db.QueryRow(q, userId).Scan(&email,&emailConfirmed,&phoneConfirmed)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::isEmailConfirmed()::error in fetching user's id and email confirmed status from database due to ",err)
-		return "","",false
-	}
-	if id != nil {
-		uId = id.(string)
+		return "",false,false
 	}
 	if email != nil {
 		uEmail = email.(string)
 	}
-	if emailConfirmed == false {
+	/* 	if emailConfirmed == false {
 		return uId,uEmail,false
-	}
-	return uId,uEmail,true
+	} */
+	return uEmail,emailConfirmed,phoneConfirmed
 }
 
 func isDeviceEnabled(uuid,imei string) (bool) {

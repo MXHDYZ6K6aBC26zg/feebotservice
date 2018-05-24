@@ -7,70 +7,44 @@ import (
 	"fmt"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
-	"io/ioutil"
+	//"io/ioutil"
 	"encoding/json"
 	s "strings"
+	"strconv"
 	"errors"
 	"time"
 
 	"github.com/labstack/echo"
 )
 
-type InitializeTransaction struct {
-	InitiateTransaction struct {
-		Amount     int      `json:"amount"`
-		Channels   []string `json:"channels"`
-		FeeID      string   `json:"fee_id"`
-		MerchantID string   `json:"merchant_id"`
-		MerchantFeeID string   `json:"merchant_fee_id"`
-		Metadata   struct {
-			CustomFields []struct {
-				DisplayName string `json:"display_name"`
-				Value       string `json:"value"`
-			} `json:"custom_fields"`
-		} `json:"metadata"`
-		Username string `json:"username"`
-	} `json:"initiateTransaction"`
-}
-
 //InitiateTransaction is a POST request handler used to initiate a transaction by the user
 func InitiateTransaction(c echo.Context) error {
-	var it InitializeTransaction
-	defer c.Request().Body.Close()
-	b,err := ioutil.ReadAll(c.Request().Body)
-	if err != nil {
-		fmt.Printf("transactionhandlers.go::ChargeUserByCard()::failed to read request body due to : %s\n", err)
-		r := h.Response {
-			Status: "error",
-			Message:"error occured, please try again",//err.Error(),
-		}
-		return c.JSON(http.StatusBadRequest, r)
-	}
-	//fmt.Printf("the raw json request is %s\n", b)
-	err = json.Unmarshal(b, &it)
-	if err != nil {
-		fmt.Println("transactionhandlers.go::InitiateTransaction()::failed to unmarshal json request body: ", err)
-		r := h.Response {
-			Status: "error",
-			Message:"error occured, please try again",//err.Error(),
-		}
-		return c.JSON(http.StatusInternalServerError, r)
-	}
-	username := it.InitiateTransaction.Username
-	merchantId := it.InitiateTransaction.MerchantID
-	merchantFeeId := it.InitiateTransaction.MerchantFeeID
-	feeId := it.InitiateTransaction.FeeID
-	amount := it.InitiateTransaction.Amount
+	userId := s.Trim(c.FormValue("userId")," ")
+	merchantId := s.Trim(c.FormValue("merchantId")," ")
+	merchantFeeId := s.Trim(c.FormValue("merchantFeeId")," ")
+	feeId := s.Trim(c.FormValue("feeId")," ")
+	amount := c.FormValue("deviceModel")
+	paymentReferenceName := c.FormValue("paymentReferenceName")
+	paymentReferenceId := c.FormValue("paymentReferenceId")
+	categoryId := s.Trim(c.FormValue("categoryId")," ")
 
-	if username == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount <= 0 {
+	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryId == "" || paymentReferenceName == "" || paymentReferenceId == ""{
 		r := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required parameters not complete",
 		}
 		return c.JSON(http.StatusBadRequest, r)	
 	}
-
-	uId,email,emailConfStatus := isEmailConfirmed(username)
+	intAmount,err := strconv.Atoi(amount)
+	if intAmount <= 0 || err != nil {
+		fmt.Println("error occured trying to convert amount string to integer is :", err)
+		r := h.Response {
+			Status: "error",
+			Message: "Amount can not be less than or equal to zero",	
+		}
+		return c.JSON(http.StatusForbidden, r)
+	}
+	email,emailConfStatus,phoneConfStatus := isEmailAndPhoneConfirmed(userId)
 	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
@@ -78,7 +52,13 @@ func InitiateTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusForbidden, r)	
 	}
-
+	if phoneConfStatus == false {
+		r := h.Response {
+			Status: "error",
+			Message:"Your phone number is yet to be verified, click 'Verify Phone Number' to verify your phone number before proceeding to make payments",
+		}
+		return c.JSON(http.StatusForbidden, r)	
+	}
 	//Generate a unique reference for the transaction
 	reference := rand.RandStr(18, "alphanum")
 	fmt.Println("generated reference is - ", reference)
@@ -93,14 +73,15 @@ func InitiateTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusForbidden, r)
 	}
+	categoryName,_ := getCategory(categoryId) 
 
 	//TODO: call a function to insert the details of the user and the transaction into a table
-	_,err = dbInsertUserTransaction(uId, reference, merchantId, feeId, amount)
+	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
 
-	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, "", "", amount)
+	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, paymentReferenceName,paymentReferenceId,categoryName,intAmount)
 	
 	bs,_:= json.Marshal(res)
 	r := h.Response {
@@ -319,7 +300,7 @@ func getSettlementAccount(merchantFeeId string) (string,string, error) {
 	return accountCode,feeBearer, nil 
 }
 
-func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) (string, error) {
+func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -329,9 +310,9 @@ func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) 
 
 	//txTimeStamp, _ := time.Parse(time.RFC3339,txDate) 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId") 
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId).Scan(&insertedTxId)
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err
@@ -342,4 +323,24 @@ func dbInsertUserTransaction(uId,reference,merchantId,feeId string, amount int) 
 	}
 	return insertedTxId, nil
 	
+}
+
+func getCategory(categoryId string) (string,error) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return "", err
+	}
+	defer con.Close()
+	var categoryName interface{}
+	var catName string 
+	q := `SELECT "Category" FROM "_categories" WHERE "Id" = $1`
+	err = con.Db.QueryRow(q,categoryId).Scan(&categoryName)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::getCategory()::error in fetching category name from database due to ",err)
+		return "",err
+	}
+	if categoryName != nil {
+		catName = categoryName.(string)
+	}
+	return catName,nil
 }

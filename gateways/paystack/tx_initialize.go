@@ -6,7 +6,7 @@ import (
 	g "github.com/kenmobility/feezbot/gateways"
 )
 
-func InitializeTransaction(reference, customerEmail, subaccount,bearer,txSubject,txDesc string, amount int) *g.InitializeTxResponse {
+func InitializeTransaction(reference, customerEmail, subaccount,bearer,txReferenceName,txReferenceId,categoryName string, amount int) *g.InitializeTxResponse {
 	url := "https://api.paystack.co/transaction/initialize"
 	postData := fmt.Sprintf(`{
 		"reference": "%s", 
@@ -17,7 +17,15 @@ func InitializeTransaction(reference, customerEmail, subaccount,bearer,txSubject
 		"metadata":{
 			"custom_fields":[
 				{
-					"display_name": "%s",
+					"display_name": "Payment Category",
+					"value":"%s"	
+				},
+				{
+					"display_name": "Payment Reference Name",
+					"value":"%s"	
+				},
+				{
+					"display_name": "Payment Reference ID",
 					"value":"%s"	
 				}
 			]
@@ -25,7 +33,7 @@ func InitializeTransaction(reference, customerEmail, subaccount,bearer,txSubject
 		"channels": [
 			"card","bank"
 		]
-	}`,reference,amount * 100, customerEmail,subaccount,bearer,txSubject,txDesc)
+	}`,reference,amount * 100, customerEmail,subaccount,bearer,categoryName,txReferenceName,txReferenceId)
 	
 	resp, statusCode := sendHTTPPostRequest(url, "POST", postData)
 	if statusCode == -1 {
