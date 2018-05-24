@@ -23,7 +23,7 @@ func InitiateTransaction(c echo.Context) error {
 	merchantId := s.Trim(c.FormValue("merchantId")," ")
 	merchantFeeId := s.Trim(c.FormValue("merchantFeeId")," ")
 	feeId := s.Trim(c.FormValue("feeId")," ")
-	amount := c.FormValue("deviceModel")
+	amount := c.FormValue("amount")
 	paymentReferenceName := c.FormValue("paymentReferenceName")
 	paymentReferenceId := c.FormValue("paymentReferenceId")
 	categoryId := s.Trim(c.FormValue("categoryId")," ")
