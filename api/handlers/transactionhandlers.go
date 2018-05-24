@@ -3,11 +3,9 @@ package handlers
 import (
 	"github.com/kenmobility/feezbot/gateways/paystack"
 	"github.com/kenmobility/feezbot/rand"
-	//g "github.com/kenmobility/feezbot/gateways"
 	"fmt"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
-	//"io/ioutil"
 	"encoding/json"
 	s "strings"
 	"strconv"
@@ -26,9 +24,9 @@ func InitiateTransaction(c echo.Context) error {
 	amount := c.FormValue("amount")
 	paymentReferenceName := c.FormValue("paymentReferenceName")
 	paymentReferenceId := c.FormValue("paymentReferenceId")
-	categoryId := s.Trim(c.FormValue("categoryId")," ")
+	categoryName := s.Trim(c.FormValue("categoryName")," ")
 
-	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryId == "" || paymentReferenceName == "" || paymentReferenceId == ""{
+	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryName == "" || paymentReferenceName == "" || paymentReferenceId == ""{
 		r := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required parameters not complete",
@@ -73,7 +71,6 @@ func InitiateTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusForbidden, r)
 	}
-	categoryName,_ := getCategory(categoryId) 
 
 	//TODO: call a function to insert the details of the user and the transaction into a table
 	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantName,feeTitle,paymentReferenceName,paymentReferenceId,intAmount)
@@ -329,24 +326,4 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	}
 	return insertedTxId, nil
 	
-}
-
-func getCategory(categoryId string) (string,error) {
-	con, err := h.OpenConnection()
-	if err != nil {
-		return "", err
-	}
-	defer con.Close()
-	var categoryName interface{}
-	var catName string 
-	q := `SELECT "Category" FROM "_categories" WHERE "Id" = $1`
-	err = con.Db.QueryRow(q,categoryId).Scan(&categoryName)
-	if err != nil {
-		fmt.Println("transactionhandlers.go::getCategory()::error in fetching category name from database due to ",err)
-		return "",err
-	}
-	if categoryName != nil {
-		catName = categoryName.(string)
-	}
-	return catName,nil
 }
