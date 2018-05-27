@@ -8,6 +8,5 @@ import (
 func MainGroup(e *echo.Echo) {
 	e.GET("/", handlers.Test)
 	e.GET("/seedRoles", handlers.SeedTable)
-	e.POST("/formTest", handlers.Test2)
 	e.GET("/user/transaction/callback", handlers.HandleCallbackResponse)
 }

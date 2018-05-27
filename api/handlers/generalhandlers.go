@@ -16,7 +16,7 @@ const txSuccessResp = `
 <html >
 <head>
   <meta charset="UTF-8">
-  <title>iTradeCoin::Account Created</title>
+  <title>FeeRack::About Transaction</title>
       <style type="text/css">
 	  body {
   background: #e9e9e9;
@@ -152,10 +152,7 @@ const txSuccessResp = `
   color: #333333;
   text-decoration: none;
 }
-
-	  </style>
-
-  
+</style>
 </head>
 
 <body>
@@ -169,7 +166,7 @@ const txSuccessResp = `
 </div>
 <div class="pen-title">
 <h1>Your Payment transaction was Successful.</h1><br>
-<h1>You can now close your browser to return to App</h1>
+<h1>You can now close your browser to return to the App</h1>
 </div>
 <!-- Form Module-->
 <div class="module form-module">
@@ -184,7 +181,7 @@ const txFailedResp = `
 <html >
 <head>
   <meta charset="UTF-8">
-  <title>iTradeCoin::Account Created</title>
+  <title>FeeRack::About Transaction</title>
       <style type="text/css">
 	  body {
   background: #e9e9e9;
@@ -370,10 +367,9 @@ func HandleCallbackResponse(c echo.Context) error{
 		_,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
 				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
 		if err != nil {
-			fmt.Println("error encountered is ", err)
+			fmt.Println("error encountered while updating payment_transactions table is ", err)
 		}
 	}
-	
 	if resp.ResponseStatus != "success" {
 		return c.HTML(http.StatusOK,txFailedResp)
 	}
@@ -389,9 +385,7 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
-	//fmt.Println("response body for success is ",responseBody)
-	//txTimeStamp, _ := time.Parse("2006-01-02T15:04:05.99",txDate) 
-	//fmt.Println("gotten timestamp is- ",txDate, "parsed timestamp is- ",txTimeStamp)
+
 	var insertedTxId string
 	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,
 	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id"`
@@ -460,12 +454,5 @@ func SeedTable(c echo.Context) error {
 	return c.String(http.StatusOK, fmt.Sprintf("affected %v Row(s)",affRows))
 } 
 
-func Test2(c echo.Context) error {
-	userId := c.FormValue("userId")
-	username := c.FormValue("username")
-
-	fmt.Println("user id -", userId, "username ", username)
-	return c.String(http.StatusOK, "Form data test")
-}
 
 
