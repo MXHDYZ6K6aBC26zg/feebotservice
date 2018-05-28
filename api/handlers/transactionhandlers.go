@@ -33,7 +33,8 @@ func InitiateTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)	
 	}
-	intAmount,err := strconv.Atoi(amount)
+	floatAmount, err := strconv.ParseFloat(amount, 64)
+	intAmount := int(floatAmount)//strconv.Atoi(amount)
 	if intAmount <= 0 || err != nil {
 		fmt.Println("error occured trying to convert amount string to integer is :", err)
 		r := h.Response {

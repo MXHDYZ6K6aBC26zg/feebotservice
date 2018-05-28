@@ -145,13 +145,13 @@ func Login(c echo.Context) error {
 	}
 
 	//if password is valid and account isn't locked out, check if phone number has been confirmed
-	if uPhoneConf == false {
+	/* if uPhoneConf == false {
 		res := h.Response {
 			Status: "error",
 			Message:"User Phone number yet to be confirmed",
 		}
 		return c.JSON(http.StatusUnauthorized, res)
-	}
+	} */
 
 	//Update or insert login_counts table for user
 	_,err = loginCountsUpdateOrInsert(uId)
