@@ -34,7 +34,7 @@ func InitiateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, r)	
 	}
 	floatAmount, err := strconv.ParseFloat(amount, 64)
-	intAmount := int(floatAmount)//strconv.Atoi(amount)
+	intAmount := int(floatAmount)
 	if intAmount <= 0 || err != nil {
 		fmt.Println("error occured trying to convert amount string to integer is :", err)
 		r := h.Response {
@@ -47,14 +47,14 @@ func InitiateTransaction(c echo.Context) error {
 	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
-			Message:"Your Email address has not yet been confirmed, click 'Confirm My Email' to confirm ur Address before proceeding to make payments",
+			Message:"Your email address has not yet been confirmed. Please confirm your email to proceed with payment",
 		}
 		return c.JSON(http.StatusForbidden, r)	
 	}
 	if phoneConfStatus == false {
 		r := h.Response {
 			Status: "error",
-			Message:"Your phone number is yet to be verified, click 'Verify Phone Number' to verify your phone number before proceeding to make payments",
+			Message:"Your phone number is yet to be verified. Please verify your phone number to proceed with payment",
 		}
 		return c.JSON(http.StatusForbidden, r)	
 	}
@@ -73,12 +73,6 @@ func InitiateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)
 	}
 
-	//TODO: call a function to insert the details of the user and the transaction into a table
-	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
-	if err != nil {
-		fmt.Println("error while inserting user transaction detail : ", err)
-	}
-
 	res := paystack.InitializeTransaction(reference, email, subaccount, feeBearer, paymentReferenceName,paymentReferenceId,categoryName,merchantName,feeTitle,intAmount)
 	
 	bs,_:= json.Marshal(res)
@@ -86,6 +80,11 @@ func InitiateTransaction(c echo.Context) error {
 		Status: res.Status,
 		Message:res.ResponseMsg,
 		Data: bs,
+	}
+	//TODO: call a function to insert the details of the user and the transaction into a table
+	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,res.AuthorizationUrl,res.AccessCode,intAmount)
+	if err != nil {
+		fmt.Println("error while inserting user transaction detail : ", err)
 	}
 	return c.JSON(res.StatusCode, r)
 }
@@ -125,7 +124,7 @@ func getSettlementAccount(merchantFeeId string) (string,string,string,string, er
 	return sMerchantName,accountCode,sFeeName,feeBearer, nil 
 }
 
-func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
+func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId,authUrl,accessCode string, amount int) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -133,9 +132,9 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	defer con.Close()
 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId","AuthorizationUrl","AccessCode") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId,authUrl,accessCode).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err
