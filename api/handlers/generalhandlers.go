@@ -376,13 +376,57 @@ func HandleCallbackResponse(c echo.Context) error{
 	return c.HTML(http.StatusOK, txSuccessResp)
 }
 
+func VerifyTransaction(c echo.Context) error {
+  reference := c.QueryParam("reference")
+	if reference == "" {
+		log.Println("no reference found")
+		r := h.Response {
+      Status: "error",
+      Message:"no reference found",
+    }
+    return c.JSON(http.StatusNotFound, r)
+	}
+	log.Println("reference is ", reference)
+
+	resp := paystack.VerifyTransaction(reference)
+	if resp.StatusCode != 200 {
+		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
+	}
+
+	var updatedStatus bool
+	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
+	uStatus,_ := h.DBSelect(q,reference)
+	if uStatus != nil {
+		updatedStatus = uStatus.(bool)
+	}
+	
+	if updatedStatus == false {
+		_,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
+				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
+		if err != nil {
+			fmt.Println("error encountered while updating payment_transactions table is ", err)
+		}
+	}
+	if resp.ResponseStatus != "success" {
+		r := h.Response {
+      Status: "success",
+      Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s",reference,resp.GatewayResponse),
+    }
+    return c.JSON(http.StatusOK, r)
+  }
+  r := h.Response {
+    Status: "success",
+    Message: fmt.Sprintf("Payment transaction with reference - %s was successful",reference),
+  }
+  return c.JSON(http.StatusOK, r)
+}
+
 func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount, 
 	responseCode,txAmount int, txFee float64) (string,error) {
 	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
-		//return c.JSON(http.StatusInternalServerError, "error in connecting to database")
 	}
 	defer con.Close()
 

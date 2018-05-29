@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/kenmobility/feezbot/gateways/paystack"
-	"github.com/kenmobility/feezbot/rand"
+	//"github.com/kenmobility/feezbot/gateways/paystack"
+	//"github.com/kenmobility/feezbot/rand"
 	"fmt"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
@@ -15,7 +15,7 @@ import (
 	"github.com/labstack/echo"
 )
 
-//InitiateTransaction is a POST request handler used to initiate a transaction by the user
+/*InitiateTransaction is a POST request handler used to initiate a transaction by the user
 func InitiateTransaction(c echo.Context) error {
 	userId := s.Trim(c.FormValue("userId")," ")
 	merchantId := s.Trim(c.FormValue("merchantId")," ")
@@ -86,7 +86,85 @@ func InitiateTransaction(c echo.Context) error {
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
+	
 	return c.JSON(res.StatusCode, r)
+}
+*/
+
+func InitiatePaymentTransaction(c echo.Context) error {
+	userId := s.Trim(c.FormValue("userId")," ")
+	merchantId := s.Trim(c.FormValue("merchantId")," ")
+	merchantFeeId := s.Trim(c.FormValue("merchantFeeId")," ")
+	feeId := s.Trim(c.FormValue("feeId")," ")
+	amount := c.FormValue("amount")
+	paymentReferenceName := c.FormValue("paymentReferenceName")
+	paymentReferenceId := c.FormValue("paymentReferenceId")
+	categoryName := s.Trim(c.FormValue("categoryName")," ")
+	reference := s.Trim(c.FormValue("reference")," ")
+
+	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryName == "" || paymentReferenceName == "" || paymentReferenceId == "" || reference == ""{
+		r := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required parameters not complete",
+		}
+		return c.JSON(http.StatusBadRequest, r)	
+	}
+	floatAmount, err := strconv.ParseFloat(amount, 64)
+	intAmount := int(floatAmount)
+	if intAmount <= 0 || err != nil {
+		fmt.Println("error occured trying to convert amount string to integer is :", err)
+		r := h.Response {
+			Status: "error",
+			Message: "Amount can not be less than or equal to zero",	
+		}
+		return c.JSON(http.StatusForbidden, r)
+	}
+	email,emailConfStatus,phoneConfStatus := isEmailAndPhoneConfirmed(userId)
+	if emailConfStatus == false {
+		r := h.Response {
+			Status: "error",
+			Message:"Your email address has not yet been confirmed. Please confirm your email to proceed with payment",
+		}
+		return c.JSON(http.StatusForbidden, r)	
+	}
+	if phoneConfStatus == false {
+		r := h.Response {
+			Status: "error",
+			Message:"Your phone number is yet to be verified. Please verify your phone number to proceed with payment",
+		}
+		return c.JSON(http.StatusForbidden, r)	
+	}
+	//Get the subaccount code for the merchant / fee 
+	merchantName,subaccount,feeTitle,feeBearer,err := getSettlementAccount(merchantFeeId)
+	if err != nil {
+		fmt.Printf("transactionhandlers.go::InitiatePaymentTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
+		r := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusForbidden, r)
+	}
+	//TODO: call a function to insert the details of the user and the transaction into a table
+	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
+	if err != nil {
+		fmt.Println("error while inserting user transaction detail : ", err)
+	}
+	
+	pDetail := map[string]string {
+		"email": email,
+		"subaccount": subaccount,
+		"feeBearer": feeBearer,
+		"merchantName": merchantName,
+		"feeTitle": feeTitle,
+		"transaction_reference": reference,
+	}
+	bs,_:= json.Marshal(pDetail)
+	r := h.Response {
+		Status: "success",
+		Message:"Transaction details recoreded",
+		Data: bs,
+	}
+	return c.JSON(http.StatusOK, r)
 }
 
 func getSettlementAccount(merchantFeeId string) (string,string,string,string, error) {
@@ -124,7 +202,7 @@ func getSettlementAccount(merchantFeeId string) (string,string,string,string, er
 	return sMerchantName,accountCode,sFeeName,feeBearer, nil 
 }
 
-func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId,authUrl,accessCode string, amount int) (string, error) {
+func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -132,9 +210,9 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	defer con.Close()
 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId","AuthorizationUrl","AccessCode") 
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId,authUrl,accessCode).Scan(&insertedTxId)
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err
