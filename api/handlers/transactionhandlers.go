@@ -135,7 +135,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)	
 	}
 	//Get the subaccount code for the merchant / fee 
-	merchantName,subaccount,feeTitle,feeBearer,err := getSettlementAccount(merchantFeeId)
+	_,subaccount,_,feeBearer,err := getSettlementAccount(merchantFeeId)
 	if err != nil {
 		fmt.Printf("transactionhandlers.go::InitiatePaymentTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
 		r := h.Response {
@@ -154,14 +154,12 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		"email": email,
 		"subaccount_code": subaccount,
 		"fee_bearer": feeBearer,
-		"merchant_name": merchantName,
-		"fee_title": feeTitle,
 		"transaction_reference": reference,
 	}
 	bs,_:= json.Marshal(pDetail)
 	r := h.Response {
 		Status: "success",
-		Message:"Transaction details recoreded",
+		Message:"Transaction details recorded",
 		Data: bs,
 	}
 	return c.JSON(http.StatusOK, r)
