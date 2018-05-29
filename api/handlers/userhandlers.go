@@ -902,7 +902,7 @@ func sendConfirmationCode(userId,email string) error {
 	var ruId string 
 	code := s.ToUpper(rand.RandStr(6, "alphanum"))
 	fmt.Println("code to be emailed to user is :", code)
-	msgBody := fmt.Sprintf(`You have requested to reset your FeeRack App Login password, Enter the confirmation code below within 2 hours as the code expires after 2 hours from the time recieved. Ignore if you didn't make this request. \n %s`,code)
+	msgBody := fmt.Sprintf(`You have requested to reset your FeeRack App Login password, Enter the confirmation code below within 10 minutes as the code expires after 10 minutes from the time recieved. Ignore if you didn't make this request. %s`,code)
 	//send this code to the user's email
 	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, "FeeRack Reset Password Confirmation code", msgBody)
 	err = e.SendMail(mailObj)

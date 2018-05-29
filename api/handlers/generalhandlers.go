@@ -2,13 +2,9 @@ package handlers
 
 import (
 	"github.com/labstack/echo"
-	"github.com/kenmobility/feezbot/gateways/paystack"
 	h "github.com/kenmobility/feezbot/helper"
 	"net/http"
 	"fmt"
-	"log"
-	"errors"
-
 )
 
 const txSuccessResp = `
@@ -343,7 +339,7 @@ const txFailedResp = `
 </html>
 `
 
-func HandleCallbackResponse(c echo.Context) error{
+/* func HandleCallbackResponse(c echo.Context) error{
 	reference := c.QueryParam("reference")
 	if reference == "" {
 		log.Println("no reference found")
@@ -374,76 +370,7 @@ func HandleCallbackResponse(c echo.Context) error{
 		return c.HTML(http.StatusOK,txFailedResp)
 	}
 	return c.HTML(http.StatusOK, txSuccessResp)
-}
-
-func VerifyTransaction(c echo.Context) error {
-  reference := c.QueryParam("reference")
-	if reference == "" {
-		log.Println("no reference found")
-		r := h.Response {
-      Status: "error",
-      Message:"no reference found",
-    }
-    return c.JSON(http.StatusNotFound, r)
-	}
-	log.Println("reference is ", reference)
-
-	resp := paystack.VerifyTransaction(reference)
-	if resp.StatusCode != 200 {
-		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
-	}
-
-	var updatedStatus bool
-	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
-	uStatus,_ := h.DBSelect(q,reference)
-	if uStatus != nil {
-		updatedStatus = uStatus.(bool)
-	}
-	
-	if updatedStatus == false {
-		_,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
-				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
-		if err != nil {
-			fmt.Println("error encountered while updating payment_transactions table is ", err)
-		}
-	}
-	if resp.ResponseStatus != "success" {
-		r := h.Response {
-      Status: "success",
-      Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s",reference,resp.GatewayResponse),
-    }
-    return c.JSON(http.StatusOK, r)
-  }
-  r := h.Response {
-    Status: "success",
-    Message: fmt.Sprintf("Payment transaction with reference - %s was successful",reference),
-  }
-  return c.JSON(http.StatusOK, r)
-}
-
-func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount, 
-	responseCode,txAmount int, txFee float64) (string,error) {
-	
-	con, err := h.OpenConnection()
-	if err != nil {
-		return "", err
-	}
-	defer con.Close()
-
-	var insertedTxId string
-	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,
-	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId)
-	if err != nil {
-		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
-		return "",err
-	}
-	//check if the row was inserted successfully
-	if insertedTxId == "" {
-		return "", errors.New("inserting into transactions failed")
-	} 
-	return insertedTxId, nil
-} 
+} */
 
 
 func Test(c echo.Context) error {
