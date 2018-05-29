@@ -152,10 +152,10 @@ func InitiatePaymentTransaction(c echo.Context) error {
 	
 	pDetail := map[string]string {
 		"email": email,
-		"subaccount": subaccount,
-		"feeBearer": feeBearer,
-		"merchantName": merchantName,
-		"feeTitle": feeTitle,
+		"subaccount_code": subaccount,
+		"fee_bearer": feeBearer,
+		"merchant_name": merchantName,
+		"fee_title": feeTitle,
 		"transaction_reference": reference,
 	}
 	bs,_:= json.Marshal(pDetail)
