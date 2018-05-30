@@ -264,13 +264,11 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	if insertedTxId == "" {
 		return "", errors.New("inserting into payment_transactions failed")
 	}
-	return insertedTxId, nil
-	
+	return insertedTxId, nil	
 }
 
 func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount, 
-	responseCode,txAmount int, txFee float64) (string,error) {
-	
+	responseCode,txAmount int, txFee float64) (string,error) {	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -282,7 +280,7 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id"`
 	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId)
 	if err != nil {
-		fmt.Println("transactionhandlers.go::dbinsertSuccessChargeCardResponse()::error encountered while inserting into transactions for success card response is ", err)
+		fmt.Println("transactionhandlers.go::dbUpdateChargeResponse()::error encountered while inserting into transactions for success card response is ", err)
 		return "",err
 	}
 	//check if the row was inserted successfully

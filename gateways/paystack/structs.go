@@ -67,7 +67,7 @@ type paystackSuccessChargeResponse struct {
 			Params      struct {
 				Bearer            string `json:"bearer"`
 				PercentageCharge  string `json:"percentage_charge"`
-				TransactionCharge string `json:"transaction_charge"`
+				TransactionCharge bool `json:"transaction_charge"`
 			} `json:"params"`
 			Paystack   int `json:"paystack"`
 			Subaccount int `json:"subaccount"`
