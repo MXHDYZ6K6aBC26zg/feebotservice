@@ -166,7 +166,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		"subaccount_code": subaccount,
 		"fee_bearer": feeBearer,
 		"transaction_reference": reference,
-		"transaction_charge": int(flatFee),
+		"transaction_charge": int(flatFee) * 100,
 	}
 	bs,_:= json.Marshal(pDetail)
 	r := h.Response {
@@ -309,5 +309,5 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 func amountByPercentageCharge(amount,percCharge float64) float64 {
 	mainCharge := percCharge - 1.5
 	chargeAmount := (mainCharge / 100) * (amount - 100)
-	return chargeAmount * 100
+	return chargeAmount
 }
