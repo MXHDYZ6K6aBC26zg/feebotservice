@@ -193,7 +193,8 @@ func VerifyTransaction(c echo.Context) error {
 	  if resp.StatusCode != 200 {
 		  fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
 	  }
-	  fmt.Println(resp)
+	  fmt.Printf("%+v",resp)
+	  
 	  var updatedStatus bool
 	  q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
 	  uStatus,_ := h.DBSelect(q,reference)
