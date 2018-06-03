@@ -159,7 +159,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 	}else{
 		//if amount is greater than or equal to 2500 Naira
 		flatFee = amountByPercentageCharge(floatAmount, percCharge)
-		feeBearer = "subaccount"
+		feeBearer = "account"
 	}
 	pDetail := map[string]interface{} {
 		"email": email,
@@ -308,7 +308,6 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 } 
 
 func amountByPercentageCharge(amount,percCharge float64) float64 {
-	mainCharge := percCharge - 1.5
-	chargeAmount := (mainCharge / 100) * (amount - 100)
-	return chargeAmount
+	chargeAmount := (percCharge / 100) * (amount - 100)
+	return chargeAmount + 100
 }
