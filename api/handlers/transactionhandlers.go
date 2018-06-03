@@ -204,7 +204,7 @@ func VerifyTransaction(c echo.Context) error {
 	  
 	  if updatedStatus == false {
 		  _,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
-				  resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount.(int),resp.StatusCode,resp.TxAmount,resp.TxFees)
+				  resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount.(float64),resp.MainAccountSettlementAmount.(float64),resp.StatusCode,resp.TxAmount,resp.TxFees)
 		  if err != nil {
 			  fmt.Println("error encountered while updating payment_transactions table is ", err)
 		  }
@@ -284,7 +284,7 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	return insertedTxId, nil	
 }
 
-func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount, 
+func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount float64, 
 	responseCode,txAmount int, txFee float64) (string,error) {	
 	con, err := h.OpenConnection()
 	if err != nil {

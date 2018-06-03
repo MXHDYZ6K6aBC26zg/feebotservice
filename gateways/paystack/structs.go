@@ -190,7 +190,7 @@ type verifyTransactionResponse struct {
 				TransactionCharge string `json:"transaction_charge"`
 			} `json:"params"`
 			Paystack   int `json:"paystack"`
-			Subaccount int `json:"subaccount"`
+			Subaccount interface{} `json:"subaccount"`
 		} `json:"fees_split"`
 		GatewayResponse string      `json:"gateway_response"`
 		ID              int         `json:"id"`
