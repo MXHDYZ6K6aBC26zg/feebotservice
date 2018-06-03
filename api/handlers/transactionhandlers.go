@@ -194,7 +194,7 @@ func VerifyTransaction(c echo.Context) error {
 		  fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
 	  }
 	  fmt.Printf("%+v",resp)
-	  
+
 	  var updatedStatus bool
 	  q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
 	  uStatus,_ := h.DBSelect(q,reference)
@@ -204,7 +204,7 @@ func VerifyTransaction(c echo.Context) error {
 	  
 	  if updatedStatus == false {
 		  _,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
-				  resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount,resp.StatusCode,resp.TxAmount,resp.TxFees)
+				  resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount,resp.MainAccountSettlementAmount.(int),resp.StatusCode,resp.TxAmount,resp.TxFees)
 		  if err != nil {
 			  fmt.Println("error encountered while updating payment_transactions table is ", err)
 		  }
