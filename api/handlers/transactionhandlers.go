@@ -220,7 +220,7 @@ func VerifyTransaction(c echo.Context) error {
 	  Message: fmt.Sprintf("Payment transaction with reference - %s was successful",reference),
 	}
 	return c.JSON(http.StatusOK, r)
-  }
+}
 
 func getSettlementAccount(merchantFeeId string) (string,string,string,string,float64, error) {
 	con, err := h.OpenConnection()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	s "strings"
 	g "github.com/kenmobility/feezbot/gateways"
+	"strconv"
 )
 
 func VerifyTransaction(reference string) *g.TxVerifyResponse {
@@ -37,6 +38,7 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 	if vtr.Data.Fees != nil {
 		txFees = vtr.Data.Fees.(float64)
 	}
+	
 	if s.Contains(fmt.Sprintf("%v", vtr.Data.Status), "success") == false { 
 		return &g.TxVerifyResponse {
 			StatusCode: statusCode,
@@ -59,6 +61,7 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 			Bank: vtr.Data.Authorization.Bank,
 		}
 	}
+	mainAccountCharge,_ := strconv.Atoi(vtr.Data.FeesSplit.Integration)
 	return &g.TxVerifyResponse {
 		StatusCode: statusCode,
 		Status : "success",
@@ -69,7 +72,7 @@ func VerifyTransaction(reference string) *g.TxVerifyResponse {
 		Reference: vtr.Data.Reference,
 		TxAmount: vtr.Data.Amount,
 		SubAccountSettlementAmount: vtr.Data.FeesSplit.Subaccount,
-		MainAccountSettlementAmount: vtr.Data.FeesSplit.Integration,
+		MainAccountSettlementAmount: mainAccountCharge,
 		TxFeeBearer: vtr.Data.FeesSplit.Params.Bearer,
 		PercentageCharged: vtr.Data.FeesSplit.Params.PercentageCharge,
 		TxFees: txFees,
