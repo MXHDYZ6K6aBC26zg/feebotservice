@@ -134,8 +134,10 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusForbidden, r)	
 	}
+	var feeBearer string
+	var flatFee float64
 	//Get the subaccount code for the merchant / fee 
-	_,subaccount,_,feeBearer,err := getSettlementAccount(merchantFeeId)
+	_,subaccount,_,_,percCharge,err := getSettlementAccount(merchantFeeId)
 	if err != nil {
 		fmt.Printf("transactionhandlers.go::InitiatePaymentTransaction()::error encountered trying to get settlement account for merchantFeeId - %s; is %s", merchantFeeId,err)
 		r := h.Response {
@@ -149,12 +151,22 @@ func InitiatePaymentTransaction(c echo.Context) error {
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
+	//check if amount is less than 2500 Naira
+	if intAmount < 2500 {
+		fee := (percCharge / 100) * (floatAmount - 100)
+		flatFee = fee + 100
+		feeBearer = "account"
+	}
+	//if amount is greater than or equal to 2500 Naira
+	flatFee = amountByPercentageCharge(floatAmount, percCharge)
+	feeBearer = "subaccount"
 	
-	pDetail := map[string]string {
+	pDetail := map[string]interface{} {
 		"email": email,
 		"subaccount_code": subaccount,
 		"fee_bearer": feeBearer,
 		"transaction_reference": reference,
+		"transaction_charge": int(flatFee),
 	}
 	bs,_:= json.Marshal(pDetail)
 	r := h.Response {
@@ -210,29 +222,30 @@ func VerifyTransaction(c echo.Context) error {
 	return c.JSON(http.StatusOK, r)
   }
 
-func getSettlementAccount(merchantFeeId string) (string,string,string,string, error) {
+func getSettlementAccount(merchantFeeId string) (string,string,string,string,float64, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in connecting to database due to ",err)
-		return "","","","",err
+		return "","","","",-1.0,err
 	}
 	defer con.Close()
-	var code,bearer,iMerchantName,iFeeName interface{}
+	var code,bearer,iMerchantName,iFeeName, ifeeChargePerc interface{}
 	var accountCode,feeBearer,sMerchantName,sFeeName string 
-	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer","merchants"."Title", get_fee_title("merchant_fees"."FeeId") FROM "merchant_accounts" 
+	var feeChargePercFloat float64
+	q := `SELECT "merchant_accounts"."AccountCode","merchant_fees"."FeeBearer","merchant_fees"."PercentageChargeByFee","merchants"."Title", get_fee_title("merchant_fees"."FeeId") FROM "merchant_accounts" 
 	INNER JOIN "merchant_fees" ON "merchant_fees"."Id" = "merchant_accounts"."MerchantFeeId" INNER JOIN "merchants" ON "merchants"."Id" = "merchant_accounts"."MerchantId" WHERE "merchant_accounts"."MerchantFeeId" = $1 AND "merchant_accounts"."Enabled" = $2` 
-	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer,&iMerchantName,&iFeeName)
+	err = con.Db.QueryRow(q, merchantFeeId,true).Scan(&code,&bearer,&ifeeChargePerc,&iMerchantName,&iFeeName)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::getSettlementAccount()::error in fetching account code from database due to ",err)
 		if s.Contains(fmt.Sprintf("%v", err), "no rows") == true {
-			return "","","","",errors.New("Sorry, selected fee is yet to be enabled")
+			return "","","","",-1.0,errors.New("Sorry, selected fee is yet to be enabled")
 		}
 	}
 	if code == nil {
-		return "","","","",errors.New("account code for merchant/fee not yet generated")
+		return "","","","",-1.0,errors.New("account code for merchant/fee not yet generated")
 	}
 	if bearer == nil {
-		return "","","","",errors.New("fee bearer for merchant/fee is empty")
+		return "","","","",-1.0,errors.New("fee bearer for merchant/fee is empty")
 	}
 	if iMerchantName != nil {
 		sMerchantName = iMerchantName.(string)
@@ -240,9 +253,12 @@ func getSettlementAccount(merchantFeeId string) (string,string,string,string, er
 	if iFeeName != nil {
 		sFeeName = iFeeName.(string)
 	}
+	if ifeeChargePerc != nil {
+		feeChargePercFloat = ifeeChargePerc.(float64)
+	}
 	accountCode = code.(string)
 	feeBearer = bearer.(string)
-	return sMerchantName,accountCode,sFeeName,feeBearer, nil 
+	return sMerchantName,accountCode,sFeeName,feeBearer,feeChargePercFloat, nil 
 }
 
 func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
@@ -289,3 +305,9 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 	} 
 	return insertedTxId, nil
 } 
+
+func amountByPercentageCharge(amount,percCharge float64) float64 {
+	mainCharge := percCharge - 1.5
+	chargeAmount := (mainCharge / 100) * (amount - 100)
+	return chargeAmount * 100
+}
