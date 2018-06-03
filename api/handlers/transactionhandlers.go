@@ -156,11 +156,11 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		fee := (percCharge / 100) * (floatAmount - 100)
 		flatFee = fee + 100
 		feeBearer = "account"
+	}else{
+		//if amount is greater than or equal to 2500 Naira
+		flatFee = amountByPercentageCharge(floatAmount, percCharge)
+		feeBearer = "subaccount"
 	}
-	//if amount is greater than or equal to 2500 Naira
-	flatFee = amountByPercentageCharge(floatAmount, percCharge)
-	feeBearer = "subaccount"
-	
 	pDetail := map[string]interface{} {
 		"email": email,
 		"subaccount_code": subaccount,
