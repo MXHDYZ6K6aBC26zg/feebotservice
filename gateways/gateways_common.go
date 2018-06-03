@@ -54,7 +54,7 @@ type TxVerifyResponse struct {
 	TxAmount							int
 	PercentageCharged					string
 	SubAccountSettlementAmount			int
-	MainAccountSettlementAmount			int
+	MainAccountSettlementAmount			interface{}
 	TxFees								float64
 	TxCurrency							string
 	TxCreatedAt							string

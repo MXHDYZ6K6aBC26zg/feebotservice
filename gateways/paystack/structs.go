@@ -183,7 +183,7 @@ type verifyTransactionResponse struct {
 		Domain          string      `json:"domain"`
 		Fees            interface{} `json:"fees"`
 		FeesSplit struct {
-			Integration string `json:"integration"`
+			Integration interface{} `json:"integration"`
 			Params      struct {
 				Bearer            string `json:"bearer"`
 				PercentageCharge  string `json:"percentage_charge"`
