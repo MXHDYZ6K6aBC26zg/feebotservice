@@ -311,3 +311,128 @@ func amountByPercentageCharge(amount,percCharge float64) float64 {
 	chargeAmount := (percCharge / 100) * (amount - 100)
 	return chargeAmount + 100
 }
+
+type txDetail struct {
+	Merchant	  string `json:"merchant"`
+	Category      string `json:"category"`
+	Date          time.Time `json:"date"`
+	ReferenceID   string `json:"reference_id"`
+	ReferenceName string `json:"reference_name"`
+	Status		  string  `json:"status"`
+	ResponseMessage string  `json:"response_message"`
+}
+type transactionLists struct {
+	FeeTitle    string `json:"fee_title"`
+	TxReference string `json:"tx_reference"`
+	Amount  int64 `json:"amount"`
+	Details txDetail `json:"details"`
+}
+type UserTransactions struct {
+	UserTx []transactionLists  `json:"transaction_lists"`
+}
+
+func TransactionList(c echo.Context) error {
+	userId := s.Trim(c.FormValue("userId")," ")
+	limit := c.FormValue("limit")
+	search := s.Title(c.FormValue("search"))
+	if userId == "" || limit == ""{
+		r := h.Response {
+			Status: "error",
+			Message:"'UserId' not supplied",
+		}
+		return c.JSON(http.StatusBadRequest, r)	
+	}
+	if limit == "" { 
+		r := h.Response {
+			Status: "error",
+			Message:"'limit' parameter can not be empty",
+		}
+		return c.JSON(http.StatusBadRequest, r)	
+	}
+	con, err := h.OpenConnection()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	transactions := make([]transactionLists,0)
+	var iTxReference,iAmount,iReferenceName,iReferenceId,iPaidAt,iCategoryName,iStatus,iResponse,iFeeTitle,iMerchant interface{}
+	var sTxReference, sReferenceName,sReferenceId,sCategoryName,sStatus,sResponse,sFeeTitle,sMerchant string
+	var paidAt time.Time
+	var amountPaid int64
+	q := `SELECT "payment_transactions"."TxReference","payment_transactions"."AmountPaid","payment_transactions"."TxPaymentReferenceName","payment_transactions"."TxPaymentReferenceId","payment_transactions"."PaidAt","payment_transactions"."CategoryName","payment_transactions"."TxStatus","payment_transactions"."GatewayResponse","fees"."Title","merchants"."Title" FROM "public"."payment_transactions" INNER JOIN "fees" ON "fees"."Id" = "payment_transactions"."FeeId" INNER JOIN "merchants" ON "merchants"."Id" = "payment_transactions"."MerchantId" where "payment_transactions"."UserId" = $1 AND "IsUpdated" = $2 AND "fees"."Title" LIKE '%` + search +`%' ORDER BY "payment_transactions"."PaidAt" DESC LIMIT $3`
+	txRows,err := con.Db.Query(q,userId,true,limit)
+	defer txRows.Close()
+	if err != nil {
+		if s.Contains(fmt.Sprintf("%v", err), "no records") == true {
+			res := h.Response {
+				Status: "error",
+				Message:"No record found for the search value",
+			}
+			return c.JSON(http.StatusOK, res)	
+		}else{
+			fmt.Println("transactionhandlers.go::TransactionList()::error in fetching transaction list from payment_transactions due to ",err)
+			return c.String(http.StatusInternalServerError, err.Error())
+		}	
+	}
+	for txRows.Next() {
+		err = txRows.Scan(&iTxReference,&iAmount,&iReferenceName,&iReferenceId,&iPaidAt,&iCategoryName,&iStatus,&iResponse,&iFeeTitle,&iMerchant)
+		if iTxReference != nil {
+			sTxReference = iTxReference.(string)
+		}
+		if iReferenceName != nil {
+			sReferenceName = iReferenceName.(string)
+		}
+		if iReferenceId != nil {
+			sReferenceId = iReferenceId.(string)
+		}
+		if iPaidAt != nil {
+			paidAt = iPaidAt.(time.Time)
+		}
+		if iCategoryName != nil {
+			sCategoryName = iCategoryName.(string)
+		}
+		if iStatus != nil {
+			sStatus = iStatus.(string)
+		}
+		if iResponse != nil {
+			sResponse = iResponse.(string)
+		}
+		if iFeeTitle != nil {
+			sFeeTitle = iFeeTitle.(string)
+		}
+		if iMerchant != nil {
+			sMerchant = iMerchant.(string)
+		}
+		if iAmount != nil {
+			amountPaid = iAmount.(int64)
+		}
+
+		txDetail := txDetail{
+			Merchant: sMerchant,	 
+			Category: sCategoryName,    
+			Date: paidAt,      
+			ReferenceID: sReferenceId,  
+			ReferenceName: sReferenceName,
+			Status: sStatus,  
+			ResponseMessage: sResponse,
+		}
+		txLists := transactionLists {
+			FeeTitle: sFeeTitle,
+			TxReference: sTxReference,
+			Amount: amountPaid,
+			Details: txDetail,
+		}
+		transactions = append(transactions,txLists)
+	}
+	lists := UserTransactions {
+		UserTx: transactions,
+	}
+
+	bs,_:= json.Marshal(lists)
+	res := h.Response {
+		Status: "success",
+		Message: "User transactions fetched successfully",
+		Data: bs,
+	}
+	return c.JSON(http.StatusOK,res)
+}
