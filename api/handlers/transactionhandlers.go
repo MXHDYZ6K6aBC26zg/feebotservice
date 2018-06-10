@@ -219,7 +219,7 @@ func VerifyTransaction(c echo.Context) error {
 	}
 	//fmt.Println("tx id is ", txId)
 	//TODO: calculate the allocation for associate account(s) based on the settlement merchant 
-	go associateSettlement(resp.TxAmount - 100, merchantId, txId)
+	go associateSettlement(resp.TxAmount / 100, merchantId, txId)
 	fmt.Println("....sending response to mobile.....")
 	r := h.Response {
 	  Status: "success",
@@ -473,7 +473,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 		if err != nil {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
 		}
-		payAmount := (payablePercentage / 100) * (float64(txAmount))
+		payAmount := (payablePercentage / 100) * (float64(txAmount - 100))
 		fmt.Println("pay amount is = ", payAmount)
 		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
@@ -494,7 +494,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 		if err != nil {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in storing associate_merchant_accounts values due to ",err)
 		}
-		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount))
+		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount - 100))
 		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage / float64(aCount.(int64)),payAmount,txId).Scan(&insertedId)
