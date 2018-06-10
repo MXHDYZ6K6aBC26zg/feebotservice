@@ -179,43 +179,47 @@ func InitiatePaymentTransaction(c echo.Context) error {
 
 func VerifyTransaction(c echo.Context) error {
 	reference := c.QueryParam("reference")
-	  if reference == "" {
+	if reference == "" {
 		  log.Println("no reference found")
 		  r := h.Response {
 		Status: "error",
 		Message:"no reference found",
-	  }
+		}
 	  return c.JSON(http.StatusNotFound, r)
-	  }
-	  log.Println("reference is ", reference)
-  
-	  resp := paystack.VerifyTransaction(reference)
-	  if resp.StatusCode != 200 {
-		  fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
-	  }
-	  fmt.Printf("%+v",resp)
-
-	  var updatedStatus bool
-	  q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
-	  uStatus,_ := h.DBSelect(q,reference)
-	  if uStatus != nil {
-		  updatedStatus = uStatus.(bool)
-	  }
-	  
-	  if updatedStatus == false {
-		  _,err := dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
-				  resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount.(float64),resp.MainAccountSettlementAmount.(float64),resp.StatusCode,resp.TxAmount,resp.TxFees)
-		  if err != nil {
-			  fmt.Println("error encountered while updating payment_transactions table is ", err)
-		  }
-	  }
-	  if resp.ResponseStatus != "success" {
-		  r := h.Response {
-		Status: "success",
-		Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s",reference,resp.GatewayResponse),
-	  }
-	  return c.JSON(http.StatusOK, r)
 	}
+	log.Println("reference is ", reference)
+	var txId,merchantId string
+	var err error
+	resp := paystack.VerifyTransaction(reference)
+	if resp.StatusCode != 200 {
+		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
+	}
+	fmt.Printf("%+v",resp)
+
+	var updatedStatus bool
+	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
+	uStatus,_ := h.DBSelect(q,reference)
+	if uStatus != nil {
+		updatedStatus = uStatus.(bool)
+	}
+	  
+	if updatedStatus == false {
+		txId,merchantId,err = dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
+				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount.(float64),resp.MainAccountSettlementAmount.(float64),resp.StatusCode,resp.TxAmount,resp.TxFees)
+		if err != nil {
+			fmt.Println("error encountered while updating payment_transactions table is ", err)
+		}
+	}
+	if resp.ResponseStatus != "success" {
+		r := h.Response {
+			Status: "success",
+			Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s",reference,resp.GatewayResponse),
+		}
+		return c.JSON(http.StatusOK, r)
+	}
+	//fmt.Println("tx id is ", txId)
+	//TODO: calculate the allocation for associate account(s) based on the settlement merchant 
+	go associateSettlement(resp.TxAmount, merchantId, txId)
 	r := h.Response {
 	  Status: "success",
 	  Message: fmt.Sprintf("Payment transaction with reference - %s was successful",reference),
@@ -285,26 +289,26 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 }
 
 func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount float64, 
-	responseCode,txAmount int, txFee float64) (string,error) {	
+	responseCode,txAmount int, txFee float64) (string,string,error) {	
 	con, err := h.OpenConnection()
 	if err != nil {
-		return "", err
+		return "","",err
 	}
 	defer con.Close()
 
-	var insertedTxId string
+	var insertedTxId,merchantId string
 	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,
-	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId)
+	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id","MerchantId"`
+	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId,&merchantId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbUpdateChargeResponse()::error encountered while inserting into transactions for success card response is ", err)
-		return "",err
+		return "","",err
 	}
 	//check if the row was inserted successfully
 	if insertedTxId == "" {
-		return "", errors.New("inserting into transactions failed")
+		return "","", errors.New("inserting into transactions failed")
 	} 
-	return insertedTxId, nil
+	return insertedTxId,merchantId, nil
 } 
 
 func amountByPercentageCharge(amount,percCharge float64) float64 {
@@ -376,6 +380,9 @@ func TransactionList(c echo.Context) error {
 	}
 	for txRows.Next() {
 		err = txRows.Scan(&iTxReference,&iAmount,&iReferenceName,&iReferenceId,&iPaidAt,&iCategoryName,&iStatus,&iResponse,&iFeeTitle,&iMerchant)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::TransactionList()::error in storing transaction list values from payment_transactions due to ",err)
+		}
 		if iTxReference != nil {
 			sTxReference = iTxReference.(string)
 		}
@@ -435,4 +442,61 @@ func TransactionList(c echo.Context) error {
 		Data: bs,
 	}
 	return c.JSON(http.StatusOK,res)
+}
+
+func associateSettlement(txAmount int, merchantId,txId string) error {
+	con, err := h.OpenConnection()
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+	var payablePercentage float64
+	var insertedId,associateId string
+	queryAssociateCount := `SELECT count(*) FROM "associate_merchant_accounts" WHERE "MerchantId" = $1`
+	aCount,err := h.DBSelect(queryAssociateCount, merchantId)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::associateSettlement()::error in getting the count of associates of a merchant due to ",err)
+	}
+	fmt.Printf("transactionhandlers.go::associateSettlement():: selected count of associates with merchant Id as %s is %v",merchantId,aCount)
+	if aCount.(int64) == 0 {
+		//this implies that the merchant does not have any associate 
+		fmt.Println("transactionhandlers.go::associateSettlement():: selected count of associates is 0")
+		return nil 
+	}
+	if aCount.(int64) == 1 {
+		fmt.Println("this implies that the merchant has only one (1) associate")
+		aq := `SELECT "UserId","PayablePercentage" FROM "associate_merchant_accounts" WHERE "MerchantId" = $1`
+		err := con.Db.QueryRow(aq,merchantId).Scan(&associateId,&payablePercentage)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
+		}
+		payAmount := (payablePercentage / 100) * (float64(txAmount))
+		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAccount","TrasanctionId") 
+		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
+		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage,payAmount,txId).Scan(&insertedId)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
+			return err
+		}
+	}
+	//TODO: fetch the associate(s) of the merchant and their payable percentage using the merchant id
+	rowsQ := `SELECT "UserId","PayablePercentage" FROM "associate_merchant_accounts" WHERE "MerchantId" = $1`
+	AssociateRows,err := con.Db.Query(rowsQ, merchantId)
+	defer AssociateRows.Close()
+	//since associates for the merchant > 1; THEN split their payable percentage according to the number of associates fetched
+	for AssociateRows.Next() {
+		err := AssociateRows.Scan(&associateId,&payablePercentage)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::associateSettlement()::error in storing associate_merchant_accounts values due to ",err)
+		}
+		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount))
+		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAccount","TrasanctionId") 
+		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
+		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage / float64(aCount.(int64)),payAmount,txId).Scan(&insertedId)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
+			return err
+		}
+	}
+	return nil 
 }
