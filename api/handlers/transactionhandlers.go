@@ -457,7 +457,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 	if err != nil {
 		fmt.Println("transactionhandlers.go::associateSettlement()::error in getting the count of associates of a merchant due to ",err)
 	}
-	fmt.Printf("transactionhandlers.go::associateSettlement():: selected count of associates with merchant Id as %s is %v",merchantId,aCount)
+	fmt.Printf("transactionhandlers.go::associateSettlement():: selected count of associates with merchant Id as %s is %v\n",merchantId,aCount)
 	if aCount.(int64) == 0 {
 		//this implies that the merchant does not have any associate 
 		fmt.Println("transactionhandlers.go::associateSettlement():: selected count of associates is 0")
@@ -471,7 +471,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
 		}
 		payAmount := (payablePercentage / 100) * (float64(txAmount))
-		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAccount","TrasanctionId") 
+		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TrasanctionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage,payAmount,txId).Scan(&insertedId)
 		if err != nil {
@@ -490,7 +490,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in storing associate_merchant_accounts values due to ",err)
 		}
 		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount))
-		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAccount","TrasanctionId") 
+		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TrasanctionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage / float64(aCount.(int64)),payAmount,txId).Scan(&insertedId)
 		if err != nil {
