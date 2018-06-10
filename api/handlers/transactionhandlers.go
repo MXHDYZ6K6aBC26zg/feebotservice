@@ -474,6 +474,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
 		}
 		payAmount := (payablePercentage / 100) * (float64(txAmount))
+		fmt.Println("pay amount is = ", payAmount)
 		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage,payAmount,txId).Scan(&insertedId)
@@ -481,6 +482,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
 			return err
 		}
+		return nil
 	}
 	//TODO: fetch the associate(s) of the merchant and their payable percentage using the merchant id
 	rowsQ := `SELECT "UserId","PayablePercentage" FROM "associate_merchant_accounts" WHERE "MerchantId" = $1`
@@ -500,6 +502,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
 			return err
 		}
+		fmt.Println("pay amount is = ", payAmount)
 	}
 	return nil 
 }
