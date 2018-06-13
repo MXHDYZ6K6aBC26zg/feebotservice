@@ -100,9 +100,9 @@ func InitiatePaymentTransaction(c echo.Context) error {
 	paymentReferenceName := c.FormValue("paymentReferenceName")
 	paymentReferenceId := c.FormValue("paymentReferenceId")
 	categoryName := s.Trim(c.FormValue("categoryName")," ")
-	reference := s.Trim(c.FormValue("reference")," ")
+	vReference := s.Trim(c.FormValue("virtualReference")," ")
 
-	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryName == "" || paymentReferenceName == "" || paymentReferenceId == "" || reference == ""{
+	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryName == "" || paymentReferenceName == "" || paymentReferenceId == "" || vReference == ""{
 		r := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required parameters not complete",
@@ -147,7 +147,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)
 	}
 	//TODO: call a function to insert the details of the user and the transaction into a table
-	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
+	_,err = dbInsertUserTransaction(userId, vReference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
@@ -165,7 +165,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		"email": email,
 		"subaccount_code": subaccount,
 		"fee_bearer": feeBearer,
-		"transaction_reference": reference,
+		"virtual_reference": vReference,
 		"transaction_charge": int(flatFee) * 100,
 	}
 	bs,_:= json.Marshal(pDetail)
@@ -178,33 +178,43 @@ func InitiatePaymentTransaction(c echo.Context) error {
 }
 
 func VerifyTransaction(c echo.Context) error {
-	reference := c.QueryParam("reference")
-	if reference == "" {
-		  log.Println("no reference found")
+	txReference := c.QueryParam("txReference")
+	vReference := c.QueryParam("virtualReference")
+	if txReference == "" {
+		  log.Println("no tx reference found")
 		  r := h.Response {
 		Status: "error",
 		Message:"no reference found",
 		}
 	  return c.JSON(http.StatusNotFound, r)
 	}
-	log.Println("reference is ", reference)
+	if vReference == "" {
+		log.Println("no virtual reference found")
+		r := h.Response {
+	   Status: "error",
+	  Message:"no virtual reference found",
+	}
+	return c.JSON(http.StatusNotFound, r)
+  }
+	log.Println("tx reference is ", txReference)
+	log.Println("virtual reference is ", vReference)
 	var txId,merchantId string
 	var err error
-	resp := paystack.VerifyTransaction(reference)
+	resp := paystack.VerifyTransaction(txReference)
 	if resp.StatusCode != 200 {
-		fmt.Printf("transaction with reference %s failed due to %s\n", reference, resp.ResponseMsg)
+		fmt.Printf("transaction with reference %s failed due to %s\n", txReference, resp.ResponseMsg)
 	}
 	fmt.Printf("%+v",resp)
 
 	var updatedStatus bool
-	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "TxReference"= $1`
-	uStatus,_ := h.DBSelect(q,reference)
+	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "VirtualReference"= $1`
+	uStatus,_ := h.DBSelect(q,vReference)
 	if uStatus != nil {
 		updatedStatus = uStatus.(bool)
 	}
 	  
 	if updatedStatus == false {
-		txId,merchantId,err = dbUpdateChargeResponse(resp.Reference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
+		txId,merchantId,err = dbUpdateChargeResponse(txReference,vReference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
 				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount.(float64),resp.MainAccountSettlementAmount.(float64),resp.StatusCode,resp.TxAmount,resp.TxFees)
 		if err != nil {
 			fmt.Println("error encountered while updating payment_transactions table is ", err)
@@ -213,7 +223,7 @@ func VerifyTransaction(c echo.Context) error {
 	if resp.ResponseStatus != "success" {
 		r := h.Response {
 			Status: "success",
-			Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s",reference,resp.GatewayResponse),
+			Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s \n",txReference,resp.GatewayResponse),
 		}
 		return c.JSON(http.StatusOK, r)
 	}
@@ -223,7 +233,7 @@ func VerifyTransaction(c echo.Context) error {
 	fmt.Println("....sending response to mobile.....")
 	r := h.Response {
 	  Status: "success",
-	  Message: fmt.Sprintf("Payment transaction with reference - %s was successful",reference),
+	  Message: fmt.Sprintf("Payment transaction with reference - %s was successful \n",txReference),
 	}
 	return c.JSON(http.StatusOK, r)
 }
@@ -267,7 +277,7 @@ func getSettlementAccount(merchantFeeId string) (string,string,string,string,flo
 	return sMerchantName,accountCode,sFeeName,feeBearer,feeChargePercFloat, nil 
 }
 
-func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
+func dbInsertUserTransaction(uId,vReference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -275,9 +285,9 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	defer con.Close()
 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","TxReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","VirtualReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,reference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,vReference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err
@@ -289,7 +299,7 @@ func dbInsertUserTransaction(uId,reference,categoryName,merchantId,feeId,referen
 	return insertedTxId, nil	
 }
 
-func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount float64, 
+func dbUpdateChargeResponse(txReference,vReference,txEmail,txDate,paidAt,txStatus,txCurrency,txChannel,txAuthCode,cardLast4,responseBody, bank,cardType,gatewayResponse,feeBearer,percentageCharged string,subAccountSettlementAmount,mainAccountSettlementAmount float64, 
 	responseCode,txAmount int, txFee float64) (string,string,error) {	
 	con, err := h.OpenConnection()
 	if err != nil {
@@ -297,19 +307,18 @@ func dbUpdateChargeResponse(txReference,txEmail,txDate,paidAt,txStatus,txCurrenc
 	}
 	defer con.Close()
 
-	var insertedTxId,merchantId string
-	insertQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,
-	"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20 WHERE "TxReference" = $21  RETURNING "Id","MerchantId"`
-	err = con.Db.QueryRow(insertQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference).Scan(&insertedTxId,&merchantId)
+	var updatedTxId,merchantId string
+	updateQuery := `UPDATE "payment_transactions" SET "TxProvidedEmail" = $1, "TxCreatedAt" = $2, "TxStatus" = $3, "AmountPaid" = $4, "ResponseBody" = $5, "ResponseCode" = $6,"TxCurrency" = $7, "TxChannel" = $8,"TxAuthorizationCode" = $9 ,"CardLast4" = $10, "GatewayResponse"= $11, "TxFees" = $12,"Bank" = $13,"CardType" = $14,"PaidAt" = $15,"TxFeeBearer" = $16, "PercentageCharged" = $17, "SubAccountSettlementAmount" = $18, "MainAccountSettlementAmount" = $19, "IsUpdated" = $20,"GatewayReference" = $21 WHERE "VirtualReference" = $22  RETURNING "Id","MerchantId"`
+	err = con.Db.QueryRow(updateQuery,txEmail,txDate,txStatus,txAmount / 100,responseBody,responseCode,txCurrency,txChannel,txAuthCode,cardLast4,gatewayResponse,txFee / 100,bank,cardType,paidAt,feeBearer,percentageCharged,subAccountSettlementAmount / 100,mainAccountSettlementAmount / 100,true,txReference,vReference).Scan(&updatedTxId,&merchantId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbUpdateChargeResponse()::error encountered while inserting into transactions for success card response is ", err)
 		return "","",err
 	}
 	//check if the row was inserted successfully
-	if insertedTxId == "" {
-		return "","", errors.New("inserting into transactions failed")
+	if updatedTxId == "" {
+		return "","", errors.New("updating payment_transactions failed")
 	} 
-	return insertedTxId,merchantId, nil
+	return updatedTxId,merchantId, nil
 } 
 
 func amountByPercentageCharge(amount,percCharge float64) float64 {
