@@ -13,6 +13,7 @@ import (
 	"time"
 	"log"
 	"github.com/labstack/echo"
+	g "github.com/kenmobility/feezbot/gateways"
 )
 
 type MyJsonName struct {
@@ -213,10 +214,10 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)
 	}
 	//TODO: call a function to insert the details of the user and the transaction into a table
-	_,err = dbInsertUserTransaction(userId, vReference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
-	if err != nil {
+	go dbInsertUserTransaction(userId, vReference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
+	/* if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
-	}
+	} */
 	//check if amount is less than 2500 Naira
 	if intAmount < 2500 {
 		fee := (percCharge / 100) * (floatAmount - 100)
@@ -247,38 +248,60 @@ func VerifyTransaction(c echo.Context) error {
 	txReference := c.QueryParam("txReference")
 	vReference := c.QueryParam("virtualReference")
 	if txReference == "" {
-		  log.Println("no tx reference found")
-		  r := h.Response {
-		Status: "error",
-		Message:"no reference found",
+		log.Println("no tx reference found")
+		r := h.Response {
+			Status: "error",
+			Message:"no reference found",
 		}
-	  return c.JSON(http.StatusNotFound, r)
+	 	return c.JSON(http.StatusNotFound, r)
 	}
 	if vReference == "" {
 		log.Println("no virtual reference found")
 		r := h.Response {
-	   Status: "error",
-	  Message:"no virtual reference found",
-	}
-	return c.JSON(http.StatusNotFound, r)
-  }
+			Status: "error",
+			Message:"no virtual reference found",
+		}
+		return c.JSON(http.StatusNotFound, r)
+    }
 	log.Println("tx reference is ", txReference)
 	log.Println("virtual reference is ", vReference)
-	var txId,merchantId string
-	var err error
+	
 	resp := paystack.VerifyTransaction(txReference)
 	if resp.StatusCode != 200 {
-		fmt.Printf("transaction with reference %s failed due to %s\n", txReference, resp.ResponseMsg)
+		fmt.Printf("query to verify transaction with reference %s failed due to %s\n", txReference, resp.ResponseMsg)
+		r := h.Response {
+			Status: "error",
+			Message: fmt.Sprintf("query to verify transaction with reference %s failed due to %s\n", txReference, resp.ResponseMsg),
+		  }
+		return c.JSON(http.StatusBadRequest, r)
 	}
-	fmt.Printf("%+v",resp)
+	//fmt.Printf("%+v",resp)
+	/* if resp.ResponseStatus != "success" {
+		r := h.Response {
+			Status: "success",
+			Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s \n",txReference,resp.GatewayResponse),
+		}
+		return c.JSON(http.StatusOK, r)
+	} */
+	//fmt.Println("tx id is ", txId)
+	//TODO: calculate the allocation for associate account(s) based on the settlement merchant 
+	go runDbUpdateInfo(txReference,vReference,resp)
+	r := h.Response {
+	  Status: "success",
+	  Message: fmt.Sprintf("Payment transaction with reference - %s: %s => %s \n",txReference,resp.ResponseStatus,resp.GatewayResponse),
+	}
+	return c.JSON(http.StatusOK, r)
+}
 
+func runDbUpdateInfo(txReference,vReference string,resp *g.TxVerifyResponse) error {
 	var updatedStatus bool
+	var txId,merchantId string
+	var err error
 	q := `SELECT "IsUpdated" FROM "payment_transactions" WHERE "VirtualReference"= $1`
 	uStatus,_ := h.DBSelect(q,vReference)
 	if uStatus != nil {
 		updatedStatus = uStatus.(bool)
-	}
-	  
+	}	  
 	if updatedStatus == false {
 		txId,merchantId,err = dbUpdateChargeResponse(txReference,vReference,resp.Email,resp.TxCreatedAt,resp.PaidAt,resp.ResponseStatus,resp.TxCurrency,resp.TxChannel,resp.AuthorizationCode,resp.CardLast4,resp.ResponseBody,
 				resp.Bank,resp.CardType,resp.GatewayResponse,resp.TxFeeBearer,resp.PercentageCharged,resp.SubAccountSettlementAmount.(float64),resp.MainAccountSettlementAmount.(float64),resp.StatusCode,resp.TxAmount,resp.TxFees)
@@ -286,22 +309,8 @@ func VerifyTransaction(c echo.Context) error {
 			fmt.Println("error encountered while updating payment_transactions table is ", err)
 		}
 	}
-	if resp.ResponseStatus != "success" {
-		r := h.Response {
-			Status: "success",
-			Message: fmt.Sprintf("Payment transaction with reference - %s failed due to %s \n",txReference,resp.GatewayResponse),
-		}
-		return c.JSON(http.StatusOK, r)
-	}
-	//fmt.Println("tx id is ", txId)
-	//TODO: calculate the allocation for associate account(s) based on the settlement merchant 
-	go associateSettlement(resp.TxAmount / 100, merchantId, txId)
-	fmt.Println("....sending response to mobile.....")
-	r := h.Response {
-	  Status: "success",
-	  Message: fmt.Sprintf("Payment transaction with reference - %s was successful \n",txReference),
-	}
-	return c.JSON(http.StatusOK, r)
+	associateSettlement(resp.TxAmount / 100, merchantId, txId)
+	return nil
 }
 
 func getSettlementAccount(merchantFeeId string) (string,string,string,string,float64, error) {
