@@ -50,7 +50,7 @@ func sendHTTPPostRequest(url, requestMethod, postData string) (string,int) {
 	hc := http.Client{}
 	resp, err := hc.Do(req)
 	if err != nil {
-		fmt.Println("http post", resp, "error:", err)
+		//fmt.Println("http post", resp, "error:", err)
 		return err.Error(), -1
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
@@ -124,7 +124,6 @@ func generateCypher(clientID, secretKey, urlEncoded, httpVerb, timestamp, nonce 
 }
 
 func generateSignature(baseStringToBeSigned string) string {
-
 	s := sha512.New()
 	io.WriteString(s, baseStringToBeSigned)
 	signatureR := s.Sum(nil)

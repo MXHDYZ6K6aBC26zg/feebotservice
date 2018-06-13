@@ -125,9 +125,7 @@ func ShowMerchantFees(c echo.Context) error {
 	var numberOfInstallment int64
 	var mfAmount,firstInstallmentPerc float64
 
-	q := `SELECT "merchant_fees"."Id","merchant_fees"."FeeId","merchant_fees"."Amount","merchant_fees"."EnabledForInstallment","merchant_fees"."HowManyInstallment",
-	"merchant_fees"."FeeBearer","merchant_fees"."FirstInstallmentPercentage","fees"."Title","fees"."Type" FROM "merchant_fees" INNER JOIN "fees" ON 
-	"merchant_fees"."FeeId" = "fees"."Id" WHERE "merchant_fees"."MerchantId" = $1 AND "merchant_fees"."Enabled" = $2`
+	q := `SELECT "merchant_fees"."Id","merchant_fees"."FeeId","merchant_fees"."Amount","merchant_fees"."EnabledForInstallment","merchant_fees"."HowManyInstallment","merchant_fees"."FeeBearer","merchant_fees"."FirstInstallmentPercentage","fees"."Title","fees"."Type" FROM "merchant_fees" INNER JOIN "fees" ON "merchant_fees"."FeeId" = "fees"."Id" WHERE "merchant_fees"."MerchantId" = $1 AND "merchant_fees"."Enabled" = $2`
 
 	mFeeRows,err := con.Db.Query(q,merchantId,true)
 	defer mFeeRows.Close()
@@ -148,7 +146,6 @@ func ShowMerchantFees(c echo.Context) error {
 		if err != nil {
 			fmt.Println("merchanthandlers.go::ShowMerchantFees()::scanning query Failed due to:", err)
 		}
-	
 		if ifTitle != nil {
 			sfTitle = ifTitle.(string)
 		}

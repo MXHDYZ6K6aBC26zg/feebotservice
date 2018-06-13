@@ -15,6 +15,72 @@ import (
 	"github.com/labstack/echo"
 )
 
+type MyJsonName struct {
+	Data []struct {
+		Amount        int `json:"amount"`
+		Authorization struct {
+			AuthorizationCode string `json:"authorization_code"`
+			Bank              string `json:"bank"`
+			Bin               string `json:"bin"`
+			Brand             string `json:"brand"`
+			CardType          string `json:"card_type"`
+			Channel           string `json:"channel"`
+			CountryCode       string `json:"country_code"`
+			ExpMonth          string `json:"exp_month"`
+			ExpYear           string `json:"exp_year"`
+			Last4             string `json:"last4"`
+			Reusable          bool   `json:"reusable"`
+			Signature         string `json:"signature"`
+		} `json:"authorization"`
+		Channel   string `json:"channel"`
+		CreatedAt string `json:"createdAt"`
+		Created_At string `json:"created_at"`
+		Currency  string `json:"currency"`
+		Customer  struct {
+			CustomerCode string      `json:"customer_code"`
+			Email        string      `json:"email"`
+			FirstName    interface{} `json:"first_name"`
+			ID           int         `json:"id"`
+			LastName     interface{} `json:"last_name"`
+			Metadata     interface{} `json:"metadata"`
+			Phone        interface{} `json:"phone"`
+			RiskAction   string      `json:"risk_action"`
+		} `json:"customer"`
+		Domain          string      `json:"domain"`
+		Fees            int         `json:"fees"`
+		FeesSplit       string      `json:"fees_split"`
+		GatewayResponse string      `json:"gateway_response"`
+		ID              int         `json:"id"`
+		IPAddress       interface{} `json:"ip_address"`
+		Log             interface{} `json:"log"`
+		Message         interface{} `json:"message"`
+		Metadata        struct {
+			CustomFields []struct {
+				DisplayName  string `json:"display_name"`
+				Value        string `json:"value"`
+				VariableName string `json:"variable_name"`
+			} `json:"custom_fields"`
+		} `json:"metadata"`
+		PaidAt     string   `json:"paidAt"`
+		Paid_At     string   `json:"paid_at"`
+		Plan       struct{} `json:"plan"`
+		Reference  string   `json:"reference"`
+		Status     string   `json:"status"`
+		Subaccount struct{} `json:"subaccount"`
+	} `json:"data"`
+	Message string `json:"message"`
+	Meta    struct {
+		Page        int `json:"page"`
+		PageCount   int `json:"pageCount"`
+		PerPage     int `json:"perPage"`
+		Skipped     int `json:"skipped"`
+		Total       int `json:"total"`
+		TotalVolume int `json:"total_volume"`
+	} `json:"meta"`
+	Status bool `json:"status"`
+}
+
+
 /*InitiateTransaction is a POST request handler used to initiate a transaction by the user
 func InitiateTransaction(c echo.Context) error {
 	userId := s.Trim(c.FormValue("userId")," ")
@@ -349,7 +415,7 @@ func TransactionList(c echo.Context) error {
 	userId := s.Trim(c.FormValue("userId")," ")
 	limit := c.FormValue("limit")
 	search := s.Title(c.FormValue("search"))
-	if userId == "" || limit == ""{
+	if userId == "" {
 		r := h.Response {
 			Status: "error",
 			Message:"'UserId' not supplied",

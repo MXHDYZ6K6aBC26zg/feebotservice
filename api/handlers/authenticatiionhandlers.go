@@ -112,16 +112,15 @@ func Login(c echo.Context) error {
 	if otherNames != nil {
 		uOtherNames = otherNames.(string)
 	}
-	fmt.Printf("SELECTED: id-%s, email-%s, password-%s,phone-%s,emailConfirmed-%v,phoneConfirmed-%v,lockoutEnabled-%v,twoFaEnabled-%v,lastName-%s,otherName-%s\n", 
-		uId,uEmail,uPasswordHash,uPhone,uEmailConf,uPhoneConf,uLockoutEnabled,uTwoFaEnabled,uLastName,uOtherNames)
+	fmt.Printf("SELECTED: id-%s, email-%s, password-%s,phone-%s,emailConfirmed-%v,phoneConfirmed-%v,lockoutEnabled-%v,twoFaEnabled-%v,lastName-%s,otherName-%s\n", uId,uEmail,uPasswordHash,uPhone,uEmailConf,uPhoneConf,uLockoutEnabled,uTwoFaEnabled,uLastName,uOtherNames)
 
 	//validate user's supplied password
 	if isPasswordValid := h.BcryptValidatePassword(password, uPasswordHash); !isPasswordValid {
 		//increment AccessFailedCount field of the user
-		err := incrementAccessFailedCount(username) 
-		if err != nil {
+		go incrementAccessFailedCount(username) 
+		/* if err != nil {
 			fmt.Println("authenticationhandlers.go::Login()::failed to increment AccessFailedCount field of user due to ", err)
-		}
+		} */
 		res := h.Response {
 			Status: "error",
 			Message:"Incorrect Password!",
@@ -132,10 +131,10 @@ func Login(c echo.Context) error {
 	//check if user account has been locked out
 	if uLockoutEnabled == true {
 		//insert into user Audits table with auditEvent as 'AccountLockout'
-		_, err := userAuditsInsert(uId, ipAddress,deviceAgent, "AccountLockout")
-		if err != nil {
+		go userAuditsInsert(uId, ipAddress,deviceAgent, "AccountLockout")
+		/* if err != nil {
 			fmt.Println("failed to insert into user audits table due to ", err)
-		}
+		} */
 		//fmt.Println("id inserted into user audits account is ", userAuditId)
 		res := h.Response {
 			Status: "error",
@@ -154,16 +153,15 @@ func Login(c echo.Context) error {
 	} */
 
 	//Update or insert login_counts table for user
-	_,err = loginCountsUpdateOrInsert(uId)
-	if err != nil {
+	go loginCountsUpdateOrInsert(uId)
+	/* if err != nil {
 		fmt.Println("failed to update or insert login numberOfTimes field of login_counts table due to ", err)
-	}
-
+	} */
 	//insert into user Audits table with auditEvent as 'Login'
-	_, err = userAuditsInsert(uId, ipAddress, deviceAgent,"Login")
-	if err != nil {
+	go userAuditsInsert(uId, ipAddress, deviceAgent,"Login")
+	/* if err != nil {
 		fmt.Println("failed to insert into user audits table for successfull login due to ", err)
-	}	
+	} */	
 	uDetail := map[string]string {
 		"last_name": uLastName,
 		"other_name": uOtherNames,
@@ -224,27 +222,19 @@ func ValidateSignature(apiKey, apiSecret, signature string) (bool, string) {
 		fmt.Println("authenticationhandlers.go::ValidateSignature(): failed selecting from api_accounts due to ", err)	
 		return false, err.Error()
 	} 
-	/* if userId.(string) == "null" {
-		fmt.Println("user id equal to empty")
-		return false
-	}*/
 	if userId != nil {
 		//fmt.Println("user id not equal to nil")
 		if userId.(string) != "" {
 			query := `SELECT "Enabled" FROM api_accounts WHERE "UserId" = $1` 
 			status,_ := h.DBSelect(query,userId)
 			if status.(bool) == false{
-				return false, "Api Account yet to be Enabled"
-			}
-	
+				return false, "Api Account is yet to be Enabled"
+			}	
 			//fmt.Println(userId.(string))
 			return true, ""
 		}		
 	}
-	/* if userId == nil {
-		//fmt.Println("user id equal to nil")
-		return false		
-	} */
+	fmt.Println("authenticationhandlers.go::ValidateSignature(): user id equal to nil")
 	return false,""
 }
 
@@ -263,11 +253,11 @@ func incrementAccessFailedCount(username string) error {
 		return err
 	}	
 	if initialCount != nil {
-		fmt.Println("authenticationhandlers.go::incrementAccessFailedCount()::Selected AccessFailedCount of user as",initialCount.(int64))
+		//fmt.Println("authenticationhandlers.go::incrementAccessFailedCount()::Selected AccessFailedCount of user as",initialCount.(int64))
 		iCount = int(initialCount.(int64))
 		incrementedCount =  iCount + 1
 	}
-	fmt.Printf("current access failed count of %s is [%v]", username, incrementedCount) 
+	//fmt.Printf("current access failed count of %s is [%v]", username, incrementedCount) 
 
 	//update AspNetUsers table with the incremented count
 	updateQuery := `UPDATE "AspNetUsers" SET "AccessFailedCount"= $1 WHERE "UserName" = $2 RETURNING "Id"`
@@ -276,7 +266,7 @@ func incrementAccessFailedCount(username string) error {
 		fmt.Println("authenticationhandlers.go::incrementAccessFailedCount()::update error encountered is ", err)
 		return err
 	}
-	fmt.Println("authenticationhandlers.go::incrementAccessFailedCount()::user id incremented is ", userId)
+	//fmt.Println("authenticationhandlers.go::incrementAccessFailedCount()::user id incremented is ", userId)
 	return nil
 }
 
@@ -296,35 +286,20 @@ func loginCountsUpdateOrInsert(uId string) (string,error) {
 			if err != nil {
 				fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::error encountered is ", err)
 			}
-			fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::inserted User Id is",userId)
+			//fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::inserted User Id is",userId)
 		}
 		fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::main error encountered is ", err)
 	}	
 	if userId != "" && count > 0 {
 		//update login_counts table with the incremented count
-		fmt.Println("Selected 'UserId' as",userId, "number of times logged in selected is ", count)
+		//fmt.Println("Selected 'UserId' as",userId, "number of times logged in selected is ", count)
 		updateQuery := `UPDATE "login_counts" SET "NumberOfTimes"= $1, "LastLoggedInDate"=$2 WHERE "UserId" = $3 RETURNING "UserId"`
 		err = con.Db.QueryRow(updateQuery, count + 1,time.Now(),uId).Scan(&userId)
 		if err != nil {
 			fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::update error encountered is ", err)
 			return "",err
 		}
-		fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::user id incremented is ", userId)
+		//fmt.Println("authenticationhandlers.go::loginCountsUpdateOrInsert()::user id incremented is ", userId)
 	} 
 	return userId,nil
 }
-
-
-/* func createJwtToken(name string, emailConfirmed, phoneConfirmed bool) (string,error) {
-	claims := JwtClaims {
-		Name: name,
-		EmailConfirmed: emailConfirmed,
-		PhoneConfirmed: phoneConfirmed,
-		DefaultClaims: jwt.StandardClaims {
-			Id: "main_user_id",
-			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
-		},
-	}
-	rawToken := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-} */
-
