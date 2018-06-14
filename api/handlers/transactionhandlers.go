@@ -287,8 +287,8 @@ func VerifyTransaction(c echo.Context) error {
 	//TODO: calculate the allocation for associate account(s) based on the settlement merchant 
 	go runDbUpdateInfo(txReference,vReference,resp)
 	r := h.Response {
-	  Status: "success",
-	  Message: fmt.Sprintf("Payment transaction with reference - %s: %s => %s \n",txReference,resp.ResponseStatus,resp.GatewayResponse),
+	  Status: resp.ResponseStatus,
+	  Message: fmt.Sprintf("Payment transaction with reference, %s: %s => [%s] \n",txReference,resp.ResponseStatus,resp.GatewayResponse),
 	}
 	return c.JSON(http.StatusOK, r)
 }

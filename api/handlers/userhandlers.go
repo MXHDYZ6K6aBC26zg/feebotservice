@@ -345,21 +345,21 @@ func CreateUser(c echo.Context) error {
 		return c.JSON(http.StatusConflict, res)
 	}
 	if count == 2 {
-		err = lockUserAccount(fUId)
-		if err != nil {
+		go lockUserAccount(fUId)
+		/* if err != nil {
 			fmt.Println("error encountered while trying to lock user account for count equal to 2 is ", err)
-		}
+		} */
 		isNew = false
 	}
 	if count > 2 {
-		err = lockUserAccount(fUId)
-		if err != nil {
+		go lockUserAccount(fUId)
+		/* if err != nil {
 			fmt.Println("error encountered while trying to lock user account for count greater than 2 is ", err)
-		}
-		err = disableUserDevice(deviceUuid, deviceImei)
-		if err != nil {
+		} */
+		go disableUserDevice(deviceUuid, deviceImei)
+		/* if err != nil {
 			fmt.Println("error encountered while trying to disable user device for count greater than 2 is ", err)
-		}
+		} */
 		res := h.Response {
 			Status: "error",
 			Message: "Device locked...multiple accounts not allowed per device, contact admin",
@@ -384,7 +384,7 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("AspNetUsers id is ", userId)
+	//fmt.Println("AspNetUsers id is ", userId)
 
 	//fetch User RoleId
 	var uRoleId string
@@ -397,16 +397,16 @@ func CreateUser(c echo.Context) error {
 			if err != nil {
 				fmt.Println("error encountered is ", err)
 			}
-			fmt.Println("inserted 'User' role as",uRoleId)
+			//fmt.Println("inserted 'User' role as",uRoleId)
 		}
 		fmt.Println("main error encountered is ", err)
 	}
 	
 	if roleId != nil {
-		fmt.Println("Selected 'User' role as",roleId.(string))
+		//fmt.Println("Selected 'User' role as",roleId.(string))
 		uRoleId = roleId.(string)
 	} 
-	fmt.Println("user role Id is ", uRoleId)
+	//fmt.Println("user role Id is ", uRoleId)
 
 	//Execute AspNetUserRoles table Insert
 	AspNetUserRolesInsertedUserId,err := aspNetUserRolesInsert(userId,uRoleId)
@@ -428,7 +428,7 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("AspNetUserRolesInserted User id is ", AspNetUserRolesInsertedUserId)
+	//fmt.Println("AspNetUserRolesInserted User id is ", AspNetUserRolesInsertedUserId)
 
 	//Execute data_records table Insert
 	dataRecordId,err := dataRecordsInsert()
@@ -447,7 +447,7 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("data records id is ", dataRecordId)
+	//fmt.Println("data records id is ", dataRecordId)
 
 	//Execute profiles table insert 
 	profilesId, err := profilesInsert(userId,lastname,othername,dataRecordId,phoneVerificationId)
@@ -466,7 +466,7 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("profiles id is ", profilesId)
+	//fmt.Println("profiles id is ", profilesId)
 
 	//Execute user_devices table insert
 	userDevicesId, err := userDevicesInsertOrUpdate(userId, deviceName, deviceModel, deviceUuid, deviceImei, dataRecordId,isNew)
@@ -486,10 +486,10 @@ func CreateUser(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("user_devices id ", userDevicesId)
+	//fmt.Println("user_devices id ", userDevicesId)
 
 	//Execute user_audits table insert
-	userAuditId, err := userAuditsInsert(userId, ipAddress, "mobile","AccountCreated")
+	_, err = userAuditsInsert(userId, ipAddress, "mobile","AccountCreated")
 	if err != nil {
 		fmt.Println("inserting into profiles table failed due to ", err)
 		affRows1, _ := aspNetUsersDelete(userId)
@@ -507,7 +507,7 @@ func CreateUser(c echo.Context) error {
 			}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
-	fmt.Println("user_audits id ", userAuditId)
+	//fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
 
@@ -870,7 +870,7 @@ func lockUserAccount(userId string) error {
 	updateQuery := `UPDATE "AspNetUsers" SET "LockoutEnabled"= $1 WHERE "Id" = $2 RETURNING "Id"`
 	err = con.Db.QueryRow(updateQuery, true,userId).Scan(&userId)
 	if err != nil {
-		fmt.Println("userhandlers.go::lockUserAccount()::update error encountered is ", err)
+		fmt.Printf("userhandlers.go::lockUserAccount()::error encountered while trying to lock user account for user id - [%s] is %v\n",userId, err)
 		return err
 	}
 	return nil
