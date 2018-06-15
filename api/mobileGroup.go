@@ -18,10 +18,11 @@ func MobileGroup(g *echo.Group) {
 	g.POST("/user/reset/password", handlers.ResetPassword)
 
 	//*******HANDLERS FOR TRANSACTIONS***********//
+	g.POST("/user/tx/initiate", handlers.InitiateTransaction)
 	g.POST("/user/transaction/initiate", handlers.InitiatePaymentTransaction)
 	g.GET("/user/transaction/verify", handlers.VerifyTransaction)
 	g.POST("/user/transaction/list", handlers.TransactionList)
-	//g.POST("/user/pay/card", handlers.ChargeUserByCard)
+	g.POST("/user/pay/card", handlers.ChargeUserByCard)
 	//g.POST("/user/pay/bank", handlers.ChargeUserByBank)
 
 	//*******HANDLERS FOR USER VALIDATION PROCCESSING DURING TRANSACTIONS***********//

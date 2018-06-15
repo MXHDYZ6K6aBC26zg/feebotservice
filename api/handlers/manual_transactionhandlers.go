@@ -106,26 +106,26 @@ func ChargeUserByCard(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)	
 	} 
-	uId,email,emailConfStatus := isEmailConfirmed(username)
-	if emailConfStatus == false {
+	email,_,_ := isEmailAndPhoneConfirmed(username)
+/* 	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
 			Message:"Your Email address has not yet been confirmed, click 'Confirm My Email' to confirm ur Address before proceeding to make payments",
 		}
 		return c.JSON(http.StatusForbidden, r)	
-	}
+	} */
 	//fmt.Println("uid = ",uId, "userEmail = ", email, "merchantId = ", merchantId, "feeId = ",feeId)
 	res := paystack.ChargeByCardDetails(email, cardNumber, cardCvv, cardExpiryMonth, cardExpiryYear,amount)
-	//fmt.Printf("%+v\n", res)
+	fmt.Printf("%+v\n", res)
 
 	//call a function that will insert the details returned into the db depending on the transaction status	
-	statusResponse := checkResponseStatus(res,uId,email,merchantId,feeId,amount/100, "card")
+	//statusResponse := checkResponseStatus(res,uId,email,merchantId,feeId,amount/100, "card")
 
-	return c.JSON(res.StatusCode, statusResponse)
+	return c.JSON(res.StatusCode, "hurray")
 }
 
 //ChargeUserByBank is a POST request handler used to charge user by supported banks
-func ChargeUserByBank(c echo.Context) error {
+/* func ChargeUserByBank(c echo.Context) error {
 	var bp BankPay
 	defer c.Request().Body.Close()
 	b,err := ioutil.ReadAll(c.Request().Body)
@@ -174,7 +174,7 @@ func ChargeUserByBank(c echo.Context) error {
 	statusResponse := checkResponseStatus(res,uId,email,merchantId,feeId,amount / 100, "bank")
 
 	return c.JSON(res.StatusCode, statusResponse)
-}
+} 
 
 //ProccessPin is a POST request handler used to process the submitted user's PIN during transaction
 func ProccessPin(c echo.Context) error {
@@ -206,14 +206,14 @@ func ProccessPin(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)
 	}
-	uId,email,emailConfStatus := isEmailConfirmed(username)
-	if emailConfStatus == false {
+	email,_,_ := isEmailAndPhoneConfirmed(username)
+ 	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
 			Message:"Your Email address has not yet been confirmed, click 'Confirm My Email' to confirm ur Address before proceeding to make payments",
 		}
 		return c.JSON(http.StatusForbidden, r)	
-	}
+	} 
 
 	res := paystack.ProcessPin(pin, reference)
 
@@ -267,3 +267,4 @@ func ProccessOtp(c echo.Context) error {
 
 	return c.JSON(res.StatusCode, statusResponse)
 }
+*/

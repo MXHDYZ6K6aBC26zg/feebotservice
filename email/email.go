@@ -50,7 +50,7 @@ func SendMail(mail *mail) error {
 
 	smtpServer := smtpServer{host: "smtp.gmail.com", port: "465"}
 
-	log.Println("server host is :",smtpServer.host)
+	//log.Println("server host is :",smtpServer.host)
 	//build an auth
 	auth := smtp.PlainAuth("", mail.senderId, mail.senderPassword, smtpServer.host)
 
@@ -63,23 +63,23 @@ func SendMail(mail *mail) error {
 
 	conn, err := tls.Dial("tcp", smtpServer.ServerName(), tlsconfig)
 	if err != nil {
-		log.Panic(err)
+		log.Println("email.go::SendMail():: tls.Dial error due to: ",err)
 	}
 
 	client, err := smtp.NewClient(conn, smtpServer.host)
 	if err != nil {
-		log.Println("creating smtp new client failed due to :",err)
+		log.Println("email.go::SendMail():: creating smtp new client failed due to :",err)
 		return err//log.Panic(err)
 	}
 
 	// step 1: Use Auth
 	if err = client.Auth(auth); err != nil {
-		log.Panic(err)
+		log.Println("email.go::SendMail()::  client.Auth error due to: ",err)
 	}
 
 	// step 2: add all from and to
 	if err = client.Mail(mail.senderId); err != nil {
-		log.Panic(err)
+		log.Println("email.go::SendMail()::  client.Mail error due to: ",err)
 	}
 	/* for _, k := range mail.toId {
 		if err = client.Rcpt(k); err != nil {
@@ -111,7 +111,7 @@ func SendMail(mail *mail) error {
 
 	client.Quit()
 
-	log.Println("Mail sent successfully")
+	//log.Println("Mail sent successfully")
 	return nil
 }
 

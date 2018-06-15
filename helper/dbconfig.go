@@ -180,13 +180,13 @@ func (con *DbCon) DBSelect(query string,num ...interface{}) (result interface{},
 	var res interface{}
 	value := con.Db.QueryRow(query,num...)
 	err = value.Scan(&res)
-
 	if err == sql.ErrNoRows {
 		return nil, err
 	}
 	if err != nil {
 		return nil, err
 	} 
+	defer con.Close()
 	switch selected := res.(type) {
 	case string:
 		if selected == "" {
