@@ -309,8 +309,8 @@ func runDbUpdateInfo(txReference,vReference string,resp *g.TxVerifyResponse) err
 			fmt.Println("error encountered while updating payment_transactions table is ", err)
 		}
 	}
-	go associateSettlement(resp.TxAmount / 100, merchantId, txId)
-	go contributorSettlement(resp.TxAmount / 100, txId)
+	associateSettlement(resp.TxAmount / 100, merchantId, txId)
+	contributorSettlement(resp.TxAmount / 100, txId)
 
 	return nil
 }
