@@ -309,7 +309,9 @@ func runDbUpdateInfo(txReference,vReference string,resp *g.TxVerifyResponse) err
 			fmt.Println("error encountered while updating payment_transactions table is ", err)
 		}
 	}
-	associateSettlement(resp.TxAmount / 100, merchantId, txId)
+	go associateSettlement(resp.TxAmount / 100, merchantId, txId)
+	go contributorSettlement(resp.TxAmount / 100, txId)
+
 	return nil
 }
 
@@ -538,8 +540,8 @@ func TransactionList(c echo.Context) error {
 }
 
 func associateSettlement(txAmount int, merchantId,txId string) error {
-	fmt.Println(".......calculating associate settlement amount.........")
-	defer fmt.Println(".......end calculation........")
+	fmt.Println("..........................................calculating associate settlement amount......................................")
+	defer fmt.Println(".....................................end calculation.............................................")
 	con, err := h.OpenConnection()
 	if err != nil {
 		return err
@@ -566,12 +568,12 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
 		}
 		payAmount := (payablePercentage / 100) * (float64(txAmount - 100))
-		fmt.Println("pay amount is = ", payAmount)
-		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
+		fmt.Println("associate pay amount is = ", payAmount)
+		insertQuery := `INSERT INTO "renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage,payAmount,txId).Scan(&insertedId)
 		if err != nil {
-			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
+			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into renumeration table due to : ", err)
 			return err
 		}
 		return nil
@@ -579,6 +581,9 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 	//TODO: fetch the associate(s) of the merchant and their payable percentage using the merchant id
 	rowsQ := `SELECT "UserId","PayablePercentage" FROM "associate_merchant_accounts" WHERE "MerchantId" = $1`
 	AssociateRows,err := con.Db.Query(rowsQ, merchantId)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associates merchant info due to ",err)
+	}
 	defer AssociateRows.Close()
 	//since associates for the merchant > 1; THEN split their payable percentage according to the number of associates fetched
 	for AssociateRows.Next() {
@@ -587,14 +592,50 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in storing associate_merchant_accounts values due to ",err)
 		}
 		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount - 100))
-		insertQuery := `INSERT INTO "associate_renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
+		insertQuery := `INSERT INTO "renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage / float64(aCount.(int64)),payAmount,txId).Scan(&insertedId)
 		if err != nil {
-			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into associate_renumeration due to : ", err)
+			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into renumeration table due to : ", err)
 			return err
 		}
 		fmt.Println("pay amount is = ", payAmount)
 	}
 	return nil 
+}
+
+func contributorSettlement(txAmount int, txId string) error {
+	fmt.Println("...............................calculating contributor(s) settlement amount...................................")
+	defer fmt.Println(".................................end calculation......................................")
+
+	con, err := h.OpenConnection()
+	if err != nil {
+		return err
+	}
+	defer con.Close()
+	var payablePercentage float64
+	var insertedId,contributorId string
+	cRowsQ := `SELECT "UserId","PayablePercentage" FROM "contributors_account" WHERE "Enabled" = $1`
+	ContributorRows,err := con.Db.Query(cRowsQ, true)
+	if err != nil {
+		fmt.Println("transactionhandlers.go::contributorSettlement()::error in getting contributors_account table rows due to ",err)
+	}
+	defer ContributorRows.Close()
+
+	for ContributorRows.Next() {
+		err := ContributorRows.Scan(&contributorId,&payablePercentage)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::contributorSettlement()::error in storing contributors_account table values due to ",err)
+		}
+		payAmount := ((payablePercentage / 100) * float64(txAmount - 100))
+		insertQuery := `INSERT INTO "renumeration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
+		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
+		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),contributorId,payablePercentage,payAmount,txId).Scan(&insertedId)
+		if err != nil {
+			fmt.Println("transactionhandlers.go::contributorSettlement()::error encountered while inserting into renumeration due to : ", err)
+			return err
+		}
+		fmt.Printf("%s contributor pay amount is = %v\n",contributorId, payAmount)
+	}
+	return nil
 }
