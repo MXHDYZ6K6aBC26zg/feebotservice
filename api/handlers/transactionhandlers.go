@@ -448,7 +448,7 @@ func TransactionList(c echo.Context) error {
 	var sTxReference, sReferenceName,sReferenceId,sCategoryName,sStatus,sResponse,sFeeTitle,sMerchant string
 	var paidAt time.Time
 	var amountPaid int64
-	q := `SELECT "payment_transactions"."TxReference","payment_transactions"."AmountPaid","payment_transactions"."TxPaymentReferenceName","payment_transactions"."TxPaymentReferenceId","payment_transactions"."PaidAt","payment_transactions"."CategoryName","payment_transactions"."TxStatus","payment_transactions"."GatewayResponse","fees"."Title","merchants"."Title" FROM "public"."payment_transactions" INNER JOIN "fees" ON "fees"."Id" = "payment_transactions"."FeeId" INNER JOIN "merchants" ON "merchants"."Id" = "payment_transactions"."MerchantId" where "payment_transactions"."UserId" = $1 AND "IsUpdated" = $2 AND "fees"."Title" LIKE '%` + search +`%' ORDER BY "payment_transactions"."PaidAt" DESC LIMIT $3`
+	q := `SELECT "payment_transactions"."GatewayReference","payment_transactions"."AmountPaid","payment_transactions"."TxPaymentReferenceName","payment_transactions"."TxPaymentReferenceId","payment_transactions"."PaidAt","payment_transactions"."CategoryName","payment_transactions"."TxStatus","payment_transactions"."GatewayResponse","fees"."Title","merchants"."Title" FROM "public"."payment_transactions" INNER JOIN "fees" ON "fees"."Id" = "payment_transactions"."FeeId" INNER JOIN "merchants" ON "merchants"."Id" = "payment_transactions"."MerchantId" where "payment_transactions"."UserId" = $1 AND "IsUpdated" = $2 AND "fees"."Title" LIKE '%` + search +`%' ORDER BY "payment_transactions"."PaidAt" DESC LIMIT $3`
 	txRows,err := con.Db.Query(q,userId,true,limit)
 	defer txRows.Close()
 	if err != nil {
@@ -458,15 +458,23 @@ func TransactionList(c echo.Context) error {
 				Message:"No record found for the search value",
 			}
 			return c.JSON(http.StatusOK, res)	
-		}else{
-			fmt.Println("transactionhandlers.go::TransactionList()::error in fetching transaction list from payment_transactions due to ",err)
-			return c.String(http.StatusInternalServerError, err.Error())
+		}
+		fmt.Println("transactionhandlers.go::TransactionList()::error in fetching transaction list from payment_transactions due to ",err)
+		res := h.Response {
+			Status:  "error",
+			Message: "Error occured, please try again!",
 		}	
+		return c.JSON(http.StatusInternalServerError, res)		
 	}
 	for txRows.Next() {
 		err = txRows.Scan(&iTxReference,&iAmount,&iReferenceName,&iReferenceId,&iPaidAt,&iCategoryName,&iStatus,&iResponse,&iFeeTitle,&iMerchant)
 		if err != nil {
 			fmt.Println("transactionhandlers.go::TransactionList()::error in storing transaction list values from payment_transactions due to ",err)
+			res := h.Response {
+				Status: "error",
+				Message:"Error occured, please try again!",
+			}	
+			return c.JSON(http.StatusInternalServerError, res)	
 		}
 		if iTxReference != nil {
 			sTxReference = iTxReference.(string)
