@@ -512,7 +512,7 @@ func TransactionList(c echo.Context) error {
 		txDetail := txDetail	{
 			Merchant: sMerchant,	 
 			Category: sCategoryName,    
-			Date: paidAt.Format("2006-01-02 15:04:05.999999999 -0700 MST"),      
+			Date: paidAt.Format("2006-01-02 15:04:05.99"),      
 			ReferenceID: sReferenceId,  
 			ReferenceName: sReferenceName,
 			Status: sStatus,  
