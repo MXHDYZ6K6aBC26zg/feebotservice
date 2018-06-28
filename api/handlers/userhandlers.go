@@ -54,7 +54,7 @@ func ValidateUserExistence(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	//TODO: generate a 6 digit confirmation code and email to user
-	err := sendConfirmationCode(uId, email)
+	err := sendConfirmationCode(uId, email,"passwordReset")
 	if err != nil {
 		res := h.Response {
 			Status: "error",
@@ -90,7 +90,7 @@ func ResetPassword(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)
 	}
-	codeSent,timeSent,resetCount := getConfrimationCodeAndTimeSent(uId)
+	codeSent,timeSent,resetCount := getPasswordResetConfrimationCodeAndTimeSent(uId)
 	if codeSent != confirmationCode {
 		res := h.Response {
 			Status: "error",
@@ -132,7 +132,7 @@ func ResetPassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func getConfrimationCodeAndTimeSent(userId string) (string, time.Time,int) {
+func getPasswordResetConfrimationCodeAndTimeSent(userId string) (string, time.Time,int) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		fmt.Println("userhandlers.go::getConfrimationCodeAndTimeSent():: error in connectiong to database due to :", err)
@@ -142,7 +142,7 @@ func getConfrimationCodeAndTimeSent(userId string) (string, time.Time,int) {
 	var code string 
 	var timeSent time.Time
 	var resetCount int
-	q := `SELECT "ResetPasswordConfirmationCode", "ResetPasswordCount", "CodeSentAt" FROM "profiles" WHERE "UserId" = $1`
+	q := `SELECT "ResetPasswordConfirmationCode", "ResetPasswordCount", "ResetPasswordCodeSentAt" FROM "profiles" WHERE "UserId" = $1`
 	err = con.Db.QueryRow(q, userId).Scan(&iConfCode,&resetCount,&iTimeSent)
 	if err != nil {
 		fmt.Println("userhandlers.go::getConfrimationCodeAndTimeSent():: error in select from profiles table due to :", err)
@@ -177,6 +177,106 @@ func updatePassword(userId,hashedPassword string, resetCount int) error {
 		return err
 	}
 	return nil
+}
+
+func SendEmailConfirmationCode(c echo.Context) error {
+	userId := s.ToLower(s.Trim(c.FormValue("userId")," "))
+	email := s.ToLower(s.Trim(c.FormValue("email")," "))
+
+	if userId == "" || email == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)	
+	}
+	err := sendConfirmationCode(userId, email, "emailConfirmation")
+	if err != nil {
+		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered in sending email confirmation code is :", err)
+		res := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	res := h.Response {
+		Status: "success",
+		Message: fmt.Sprintf("Email Confirmation Code sent successfully to %s\n",email),
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func ConfirmEmailAddress(c echo.Context) error {
+	userId := s.ToLower(s.Trim(c.FormValue("userId")," "))
+	confirmationCode := s.ToUpper(s.Trim(c.FormValue("code")," "))
+
+	if userId == "" || confirmationCode == "" {
+		res := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required Credentials not complete",
+		}
+		return c.JSON(http.StatusBadRequest, res)	
+	}
+	codeSent,timeSent := getEmailConfrimationCodeAndTimeSent(userId)
+	if codeSent != confirmationCode {
+		res := h.Response {
+			Status: "error",
+			Message:"Confirmation code is invalid!",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	now := time.Now()
+	diff := now.Sub(timeSent)
+	if mins := int(diff.Minutes()); mins > 10 {
+		res := h.Response {
+			Status: "error",
+			Message:"Sorry!!...Confirmation code has expired!",
+		}
+		return c.JSON(http.StatusRequestTimeout, res)
+	}
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::getEmailConfrimationCodeAndTimeSent():: error in connectiong to database due to :", err)
+	}
+	defer con.Close()
+	var userid string
+	q := `UPDATE "AspNetUsers" SET "EmailConfirmed" = $1 WHERE "Id" = $2 RETURNING "Id"`
+	err = con.Db.QueryRow(q,true,userId).Scan(&userid)	
+	if err != nil {
+		res := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusInternalServerError, res)	
+	}
+	res := h.Response {
+		Status: "success",
+		Message:"Email Confirmation done Successfully",
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func getEmailConfrimationCodeAndTimeSent(userId string) (string, time.Time) {
+	con, err := h.OpenConnection()
+	if err != nil {
+		fmt.Println("userhandlers.go::getEmailConfrimationCodeAndTimeSent():: error in connectiong to database due to :", err)
+	}
+	defer con.Close()
+	var iConfCode, iTimeSent interface{}
+	var code string 
+	var timeSent time.Time
+	q := `SELECT "EmailConfirmationCode","EmailConfirmationCodeSentAt" FROM "profiles" WHERE "UserId" = $1`
+	err = con.Db.QueryRow(q, userId).Scan(&iConfCode,&iTimeSent)
+	if err != nil {
+		fmt.Println("userhandlers.go::getEmailConfrimationCodeAndTimeSent():: error in select from profiles table due to :", err)
+	}
+	if iConfCode != nil {
+		code = iConfCode.(string)
+	}
+	if iTimeSent != nil {
+		timeSent = iTimeSent.(time.Time)
+	}
+	return code,timeSent
 }
 
 func UpdateVerifiedPhoneNumber(c echo.Context) error {
@@ -510,6 +610,7 @@ func CreateUser(c echo.Context) error {
 	//fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
+	go sendConfirmationCode(userId, email, "emailConfirmation")
 
 	uDetail := map[string]string {
 		"user_id": userId,
@@ -519,7 +620,7 @@ func CreateUser(c echo.Context) error {
 
 	res := h.Response {
 		Status: "success",
-		Message:"You have successfully registered, a confirmation code has been sent to your email address",
+		Message:"You have successfully registered, a confirmation code has been sent to your email address, use it to confirm your email address after login in.",
 		Data: bs,
 	}
 	return c.JSON(http.StatusCreated, res)
@@ -893,26 +994,38 @@ func disableUserDevice(uuid,imei string) error {
 	return nil
 }
 
-func sendConfirmationCode(userId,email string) error {	
+func sendConfirmationCode(userId,email,purpose string) error {	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return err
 	}
 	defer con.Close()
-	var ruId string 
+	var ruId,msgBody,subject,dbCodeColumnName, dbTimeSentColumnName string 
 	code := s.ToUpper(rand.RandStr(6, "alphanum"))
 	fmt.Println("code to be emailed to user is :", code)
-	msgBody := fmt.Sprintf(`You have requested to reset your FeeRack App Login password, Enter the confirmation code below within 10 minutes as the code expires after 10 minutes from the time recieved. Ignore if you didn't make this request. %s`,code)
-	//send this code to the user's email
-	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, "FeeRack Reset Password Confirmation code", msgBody)
+	if purpose == "passwordReset" {
+		msgBody = fmt.Sprintf(`You have requested to reset your FeeRack App Login password, Enter the confirmation code below within 10 minutes as the code expires after 10 minutes from the time recieved. Ignore if you didn't make this request. %s`,code)
+		//send this code to the user's email
+		subject = "FeeRack solution Reset Password Confirmation code"
+		dbCodeColumnName = "ResetPasswordConfirmationCode"
+		dbTimeSentColumnName = "ResetPasswordCodeSentAt"
+	}
+	if purpose == "emailConfirmation" {
+		msgBody = fmt.Sprintf(`Enter the confirmation code below to confirm your email address. %s`,code)
+		//send this code to the user's email
+		subject = "FeeRack solution Email address Confirmation code"
+		dbCodeColumnName = "EmailConfirmationCode"
+		dbTimeSentColumnName = "EmailConfirmationCodeSentAt"
+	}
+	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
 	err = e.SendMail(mailObj)
 	if err != nil {
 		fmt.Println("userhandlers.go::sendConfirmationCode():: error encountered while sending mail is ", err)
 		return err
 	}
 	//update the sent code to the user's profile table on the db
-	q := `UPDATE "profiles" SET "ResetPasswordConfirmationCode" = $1, "CodeSentAt" = $2 WHERE "UserId" = $3 RETURNING "Id"`
+	q := fmt.Sprintf(`UPDATE "profiles" SET "%s" = $1, "%s" = $2 WHERE "UserId" = $3 RETURNING "Id"`,dbCodeColumnName,dbTimeSentColumnName)
 	err = con.Db.QueryRow(q, code,time.Now(),userId).Scan(&ruId)
-	fmt.Println("user id that just reset mail is :", ruId)
+	fmt.Println("user id that was sent mail is :", ruId)
 	return err
 }

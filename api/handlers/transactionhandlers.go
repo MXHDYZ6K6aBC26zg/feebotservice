@@ -406,7 +406,7 @@ func amountByPercentageCharge(amount,percCharge float64) float64 {
 type txDetail struct {
 	Merchant	  string `json:"merchant"`
 	Category      string `json:"category"`
-	Date          time.Time `json:"date"`
+	Date          string `json:"date"`
 	ReferenceID   string `json:"reference_id"`
 	ReferenceName string `json:"reference_name"`
 	Status		  string  `json:"status"`
@@ -509,10 +509,10 @@ func TransactionList(c echo.Context) error {
 			amountPaid = iAmount.(int64)
 		}
 
-		txDetail := txDetail{
+		txDetail := txDetail	{
 			Merchant: sMerchant,	 
 			Category: sCategoryName,    
-			Date: paidAt,      
+			Date: paidAt.Format("2006-01-02 15:04:05.999999999 -0700 MST"),      
 			ReferenceID: sReferenceId,  
 			ReferenceName: sReferenceName,
 			Status: sStatus,  
@@ -540,8 +540,8 @@ func TransactionList(c echo.Context) error {
 }
 
 func associateSettlement(txAmount int, merchantId,txId string) error {
-	fmt.Println("..........................................calculating associate settlement amount......................................")
-	defer fmt.Println(".....................................end calculation.............................................")
+	fmt.Println(".......................calculating associate settlement amount.........................")
+	defer fmt.Println("...........................end calculation.............................")
 	con, err := h.OpenConnection()
 	if err != nil {
 		return err
@@ -568,7 +568,7 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in getting associate merchant info due to ",err)
 		}
 		payAmount := (payablePercentage / 100) * (float64(txAmount - 100))
-		fmt.Println("associate pay amount is = ", payAmount)
+		fmt.Printf("pay amount for associate %s = %v \n",associateId,payAmount)
 		insertQuery := `INSERT INTO "remuneration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage,payAmount,txId).Scan(&insertedId)
@@ -592,21 +592,21 @@ func associateSettlement(txAmount int, merchantId,txId string) error {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error in storing associate_merchant_accounts values due to ",err)
 		}
 		payAmount := (((payablePercentage / float64(aCount.(int64))) / 100) * float64(txAmount - 100))
+		fmt.Printf("pay amount for associate %s = %v \n",associateId,payAmount)
 		insertQuery := `INSERT INTO "remuneration"("Id","UserId","PayablePercentage","SettlementAmount","TransactionId") 
 		VALUES($1,$2,$3,$4,$5) RETURNING "Id"`
 		err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),associateId,payablePercentage / float64(aCount.(int64)),payAmount,txId).Scan(&insertedId)
 		if err != nil {
 			fmt.Println("transactionhandlers.go::associateSettlement()::error encountered while inserting into remuneration table due to : ", err)
 			return err
-		}
-		fmt.Println("pay amount is = ", payAmount)
+		}		
 	}
 	return nil 
 }
 
 func contributorSettlement(txAmount int, txId string) error {
-	fmt.Println("...............................calculating contributor(s) settlement amount...................................")
-	defer fmt.Println(".................................end calculation......................................")
+	fmt.Println("......................calculating contributor(s) settlement amount..............................")
+	defer fmt.Println("..........................end calculation.............................")
 
 	con, err := h.OpenConnection()
 	if err != nil {

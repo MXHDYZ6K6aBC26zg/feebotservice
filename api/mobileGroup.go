@@ -8,10 +8,12 @@ import (
 func MobileGroup(g *echo.Group) {
 	//g.GET("/check", handlers.CheckPassword)
 
-	//*******HANDLERS FOR USER LOGIN AND USER CREATION***********//
+	//*******HANDLERS FOR USER LOGIN, USER CREATION AND VERIFICATION***********//
 	g.POST("/login", handlers.Login)
 	g.POST("/user/create", handlers.CreateUser)
 	g.POST("/user/update/verified/phone", handlers.UpdateVerifiedPhoneNumber)
+	g.POST("/user/confirm/email", handlers.ConfirmEmailAddress)
+	g.POST("/user/send/email/confirmation/code", handlers.SendEmailConfirmationCode)
 
 	//*******HANDLERS FOR FORGOTTEN PASSWORD***********//
 	g.POST("/user/validate", handlers.ValidateUserExistence)
