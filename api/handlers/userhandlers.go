@@ -1020,6 +1020,14 @@ func SendConfirmationCode(userId,email,purpose,body,subjectParam string) error {
 	if purpose == "webMail" {
 		subject = subjectParam
 		msgBody = body
+
+		mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
+		err = e.SendMail(mailObj)
+		if err != nil {
+			fmt.Println("userhandlers.go::sendConfirmationCode():: error encountered while sending mail is ", err)
+			return err
+		}
+		return nil
 	}
 	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
 	err = e.SendMail(mailObj)
