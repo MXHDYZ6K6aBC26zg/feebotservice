@@ -54,7 +54,7 @@ func ValidateUserExistence(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	//TODO: generate a 6 digit confirmation code and email to user
-	err := SendConfirmationCode(uId, email,"passwordReset","","")
+	err := sendConfirmationCode(uId, email,"passwordReset")
 	if err != nil {
 		res := h.Response {
 			Status: "error",
@@ -190,7 +190,7 @@ func SendEmailConfirmationCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
-	err := SendConfirmationCode(userId, email, "emailConfirmation","","")
+	err := sendConfirmationCode(userId, email, "emailConfirmation")
 	if err != nil {
 		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered in sending email confirmation code is :", err)
 		res := h.Response {
@@ -610,7 +610,7 @@ func CreateUser(c echo.Context) error {
 	//fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
-	go SendConfirmationCode(userId, email, "emailConfirmation","","")
+	go sendConfirmationCode(userId, email, "emailConfirmation")
 
 	uDetail := map[string]string {
 		"user_id": userId,
@@ -994,7 +994,7 @@ func disableUserDevice(uuid,imei string) error {
 	return nil
 }
 
-func SendConfirmationCode(userId,email,purpose,body,subjectParam string) error {	
+func sendConfirmationCode(userId,email,purpose string) error {	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return err
@@ -1017,18 +1017,7 @@ func SendConfirmationCode(userId,email,purpose,body,subjectParam string) error {
 		dbCodeColumnName = "EmailConfirmationCode"
 		dbTimeSentColumnName = "EmailConfirmationCodeSentAt"
 	}
-	if purpose == "webMail" {
-		subject = subjectParam
-		msgBody = body
 
-		mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
-		err = e.SendMail(mailObj)
-		if err != nil {
-			fmt.Println("userhandlers.go::sendConfirmationCode():: error encountered while sending mail is ", err)
-			return err
-		}
-		return nil
-	}
 	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
 	err = e.SendMail(mailObj)
 	if err != nil {

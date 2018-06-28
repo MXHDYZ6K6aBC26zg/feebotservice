@@ -147,7 +147,6 @@ func SendMailFromWeb(c echo.Context) error {
 	} 
 	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", recipient, subject, body)
 	err := e.SendMail(mailObj) 
-	//err := SendConfirmationCode("", recipient, "webMail", body, subject)
 	if err != nil {
 		fmt.Println("webhandlers.go::SendMailFromWeb():: error encountered while sending mail is ", err)
 		r := h.Response {
