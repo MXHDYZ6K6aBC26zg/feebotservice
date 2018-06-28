@@ -54,7 +54,7 @@ func ValidateUserExistence(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, res)
 	}
 	//TODO: generate a 6 digit confirmation code and email to user
-	err := sendConfirmationCode(uId, email,"passwordReset")
+	err := SendConfirmationCode(uId, email,"passwordReset","","")
 	if err != nil {
 		res := h.Response {
 			Status: "error",
@@ -190,7 +190,7 @@ func SendEmailConfirmationCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
-	err := sendConfirmationCode(userId, email, "emailConfirmation")
+	err := SendConfirmationCode(userId, email, "emailConfirmation","","")
 	if err != nil {
 		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered in sending email confirmation code is :", err)
 		res := h.Response {
@@ -610,7 +610,7 @@ func CreateUser(c echo.Context) error {
 	//fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
-	go sendConfirmationCode(userId, email, "emailConfirmation")
+	go SendConfirmationCode(userId, email, "emailConfirmation","","")
 
 	uDetail := map[string]string {
 		"user_id": userId,
@@ -994,7 +994,7 @@ func disableUserDevice(uuid,imei string) error {
 	return nil
 }
 
-func sendConfirmationCode(userId,email,purpose string) error {	
+func SendConfirmationCode(userId,email,purpose,body,subjectParam string) error {	
 	con, err := h.OpenConnection()
 	if err != nil {
 		return err
@@ -1016,6 +1016,10 @@ func sendConfirmationCode(userId,email,purpose string) error {
 		subject = "FeeRack solution Email address Confirmation code"
 		dbCodeColumnName = "EmailConfirmationCode"
 		dbTimeSentColumnName = "EmailConfirmationCodeSentAt"
+	}
+	if purpose == "webMail" {
+		subject = subjectParam
+		msgBody = body
 	}
 	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", email, subject, msgBody)
 	err = e.SendMail(mailObj)

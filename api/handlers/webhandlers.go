@@ -3,7 +3,7 @@ package handlers
 import(
 	"github.com/kenmobility/feezbot/gateways/paystack"
 	g "github.com/kenmobility/feezbot/gateways"
-	e "github.com/kenmobility/feezbot/email"
+	//e "github.com/kenmobility/feezbot/email"
 	"fmt"
 	"net/http"
 	"github.com/labstack/echo"
@@ -136,9 +136,16 @@ func SendMailFromWeb(c echo.Context) error {
 	recipient := s.ToLower(c.FormValue("recipient"))
 	subject := c.FormValue("subject")
 	body := c.FormValue("body")
-
-	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", recipient, subject, body)
-	err := e.SendMail(mailObj)
+	if recipient == "" || subject == "" || body == "" {
+		r := h.Response {
+			Status: "error",
+			Message:"Invalid request format Or required parameters not complete",
+		}
+		return c.JSON(http.StatusBadRequest, r)	
+	}
+	/* mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", recipient, subject, body)
+	err := e.SendMail(mailObj) */
+	err := SendConfirmationCode("", recipient, "webMail", body, subject)
 	if err != nil {
 		fmt.Println("webhandlers.go::SendMailFromWeb():: error encountered while sending mail is ", err)
 		r := h.Response {
@@ -149,7 +156,7 @@ func SendMailFromWeb(c echo.Context) error {
 	}
 	r := h.Response {
 		Status: "success",
-		Message: "Email Sent Successfully",
+		Message: fmt.Sprintf("Email Sent Successfully to %s \n",recipient),
 	}
 	return c.JSON(http.StatusOK, r)
 }
