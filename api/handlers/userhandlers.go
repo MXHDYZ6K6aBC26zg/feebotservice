@@ -1011,7 +1011,7 @@ func sendConfirmationCode(userId,email,purpose string) error {
 		dbTimeSentColumnName = "ResetPasswordCodeSentAt"
 	}
 	if purpose == "emailConfirmation" {
-		msgBody = fmt.Sprintf(`Enter the confirmation code below to confirm your email address. %s`,code)
+		msgBody = fmt.Sprintf(`Enter the confirmation code below within 10 minutes as the code expires after 10 minutes from the time recieved inorder to confirm your email address. %s`,code)
 		//send this code to the user's email
 		subject = "FeeRack solution Email address Confirmation code"
 		dbCodeColumnName = "EmailConfirmationCode"

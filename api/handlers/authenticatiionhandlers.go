@@ -167,6 +167,8 @@ func Login(c echo.Context) error {
 		"other_name": uOtherNames,
 		"username": username,
 		"user_id": uId,
+		"phone_number": uPhone,
+		"email": uEmail,
 	}
 	bs,_:= json.Marshal(uDetail)
 	dRes := h.Response {

@@ -3,6 +3,7 @@ package handlers
 import(
 	"github.com/kenmobility/feezbot/gateways/paystack"
 	g "github.com/kenmobility/feezbot/gateways"
+	e "github.com/kenmobility/feezbot/email"
 	"fmt"
 	"net/http"
 	"github.com/labstack/echo"
@@ -10,6 +11,7 @@ import(
 	h "github.com/kenmobility/feezbot/helper"
 	"encoding/json"
 	"errors"
+	s "strings"
 )
 
 type SubAccount struct {
@@ -130,6 +132,27 @@ func CreateSubAccount(c echo.Context) error {
 	return c.JSON(resp.StatusCode, r)
 }
 
+func SendMailFromWeb(c echo.Context) error {
+	recipient := s.ToLower(c.FormValue("recipient"))
+	subject := c.FormValue("subject")
+	body := c.FormValue("body")
+
+	mailObj := e.MailConfig("feeracksolution@gmail.com", "Password1@", recipient, subject, body)
+	err := e.SendMail(mailObj)
+	if err != nil {
+		fmt.Println("webhandlers.go::SendMailFromWeb():: error encountered while sending mail is ", err)
+		r := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusInternalServerError, r)
+	}
+	r := h.Response {
+		Status: "success",
+		Message: "Email Sent Successfully",
+	}
+	return c.JSON(http.StatusOK, r)
+}
 
 func isSubAccountExist(merchantId,merchantFeeId string) (bool,error) {
 	con, err := h.OpenConnection()
