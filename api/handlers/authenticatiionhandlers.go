@@ -162,13 +162,15 @@ func Login(c echo.Context) error {
 	/* if err != nil {
 		fmt.Println("failed to insert into user audits table for successfull login due to ", err)
 	} */	
-	uDetail := map[string]string {
+	uDetail := map[string]interface{} {
 		"last_name": uLastName,
 		"other_name": uOtherNames,
 		"username": username,
 		"user_id": uId,
 		"phone_number": uPhone,
 		"email": uEmail,
+		"is_phone_verified": uPhoneConf,
+		"is_email_confirmed": uEmailConf,
 	}
 	bs,_:= json.Marshal(uDetail)
 	dRes := h.Response {
