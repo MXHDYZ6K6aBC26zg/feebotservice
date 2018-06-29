@@ -190,7 +190,30 @@ func SendEmailConfirmationCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)	
 	}
-	err := sendConfirmationCode(userId, email, "emailConfirmation")
+	con, err := h.OpenConnection()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, "error in connecting to database")
+	}
+	defer con.Close()
+	var userid string
+	q := `UPDATE "AspNetUsers" SET "Email" = $1 WHERE "Id" = $2 RETURNING "Id"`
+	err = con.Db.QueryRow(q,email,userId).Scan(&userid)	
+	if err != nil {
+		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered is ", err)
+		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_Email_key"`) {
+			res := h.Response {
+				Status: "error",
+				Message: "Sorry...the email address you are trying to use is already in use by another user, please provide another email address",
+			}
+			return c.JSON(http.StatusBadRequest, res)
+		}
+		res := h.Response {
+			Status: "error",
+			Message:err.Error(),
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	err = sendConfirmationCode(userId, email, "emailConfirmation")
 	if err != nil {
 		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered in sending email confirmation code is :", err)
 		res := h.Response {
@@ -201,12 +224,12 @@ func SendEmailConfirmationCode(c echo.Context) error {
 	}
 	res := h.Response {
 		Status: "success",
-		Message: fmt.Sprintf("Email Confirmation Code sent successfully to %s\n",email),
+		Message: fmt.Sprintf("Email Confirmation Code sent successfully to %s",email),
 	}
 	return c.JSON(http.StatusOK, res)
 }
 
-func ConfirmEmailAddress(c echo.Context) error {
+func UpdateConfirmedEmailAddress(c echo.Context) error {
 	userId := s.ToLower(s.Trim(c.FormValue("userId")," "))
 	confirmationCode := s.ToUpper(s.Trim(c.FormValue("code")," "))
 
@@ -227,7 +250,7 @@ func ConfirmEmailAddress(c echo.Context) error {
 	}
 	now := time.Now()
 	diff := now.Sub(timeSent)
-	if mins := int(diff.Minutes()); mins > 10 {
+	if mins := int(diff.Minutes()); mins > 120 {
 		res := h.Response {
 			Status: "error",
 			Message:"Sorry!!...Confirmation code has expired!",
@@ -1011,7 +1034,7 @@ func sendConfirmationCode(userId,email,purpose string) error {
 		dbTimeSentColumnName = "ResetPasswordCodeSentAt"
 	}
 	if purpose == "emailConfirmation" {
-		msgBody = fmt.Sprintf(`Enter the confirmation code below within 10 minutes as the code expires after 10 minutes from the time recieved inorder to confirm your email address. %s`,code)
+		msgBody = fmt.Sprintf(`Enter the confirmation code below within 2 hours as the code expires after two hours from the time recieved inorder to confirm your email address. %s`,code)
 		//send this code to the user's email
 		subject = "FeeRack solution Email address Confirmation code"
 		dbCodeColumnName = "EmailConfirmationCode"
