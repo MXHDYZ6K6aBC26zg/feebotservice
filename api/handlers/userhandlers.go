@@ -305,7 +305,7 @@ func UpdateConfirmedEmailAddress(c echo.Context) error {
 	}
 	defer con.Close()
 	var userid string
-	q := `UPDATE "AspNetUsers" SET "EmailConfirmed" = $2 WHERE "Id" = $2 RETURNING "Id"`
+	q := `UPDATE "AspNetUsers" SET "EmailConfirmed" = $1 WHERE "Id" = $2 RETURNING "Id"`
 	err = con.Db.QueryRow(q,true,userId).Scan(&userid)	
 	if err != nil {
 		res := h.Response {
