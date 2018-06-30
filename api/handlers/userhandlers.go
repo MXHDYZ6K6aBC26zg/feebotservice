@@ -107,6 +107,37 @@ func ResetPassword(c echo.Context) error {
 		}
 		return c.JSON(http.StatusRequestTimeout, res)
 	}
+
+	numComplete,numPresent,upperPresent,specialChar := verifyPassword(password)
+	if !numComplete {
+		res := h.Response {
+			Status: "error",
+			Message:"Password must be upto 7 characters",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
+	if !numPresent {
+		res := h.Response {
+			Status: "error",
+			Message:"Password must contain a number",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
+	if !upperPresent {
+		res := h.Response {
+			Status: "error",
+			Message:"Password must contain an upper case",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
+	if !specialChar {
+		res := h.Response {
+			Status: "error",
+			Message:"Password must contain a special character",
+		}
+		return c.JSON(http.StatusForbidden, res)
+	}
+
 	passHash,err := h.BcryptHashPassword(password)
 	if err != nil {
 		fmt.Println("userhandlers.go::ResetPassword():: error in hashing provided password due to:", err)
