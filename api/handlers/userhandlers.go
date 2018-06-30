@@ -196,7 +196,10 @@ func SendEmailConfirmationCode(c echo.Context) error {
 	}
 	defer con.Close()
 	var userid string
+	//var existingEmail interface{}
 	q := `UPDATE "AspNetUsers" SET "Email" = $1 WHERE "Id" = $2 RETURNING "Id"`
+	//q := `SELECT "Email" FROM "AspNetUsers" WHERE "Id" <> $1 AND "Email" = $2`
+	//err = con.Db.QueryRow(q,userId,email).Scan(&existingEmail)
 	err = con.Db.QueryRow(q,email,userId).Scan(&userid)	
 	if err != nil {
 		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered is ", err)
@@ -213,6 +216,13 @@ func SendEmailConfirmationCode(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, res)
 	}
+	/* if existingEmail != nil {
+		res := h.Response {
+			Status: "error",
+			Message: "Sorry...the email address you are trying to use is already in use by another user, please provide another email address",
+		}
+		return c.JSON(http.StatusBadRequest, res)
+	} */
 	err = sendConfirmationCode(userId, email, "emailConfirmation")
 	if err != nil {
 		fmt.Println("userhandlers.go::SendEmailConfirmationCode():: error encountered in sending email confirmation code is :", err)
@@ -226,6 +236,7 @@ func SendEmailConfirmationCode(c echo.Context) error {
 		Status: "success",
 		Message: fmt.Sprintf("Email Confirmation Code sent successfully to %s",email),
 	}
+	fmt.Printf("Email Confirmation Code sent successfully to %s",email)
 	return c.JSON(http.StatusOK, res)
 }
 
@@ -263,7 +274,7 @@ func UpdateConfirmedEmailAddress(c echo.Context) error {
 	}
 	defer con.Close()
 	var userid string
-	q := `UPDATE "AspNetUsers" SET "EmailConfirmed" = $1 WHERE "Id" = $2 RETURNING "Id"`
+	q := `UPDATE "AspNetUsers" SET "Email" = $1, "EmailConfirmed" = $2 WHERE "Id" = $2 RETURNING "Id"`
 	err = con.Db.QueryRow(q,true,userId).Scan(&userid)	
 	if err != nil {
 		res := h.Response {
@@ -376,7 +387,7 @@ func CreateUser(c echo.Context) error {
 	phoneVerificationId := c.FormValue("phoneVerificationId")
 
 	//Check for complete credentials
-	if othername == "" || lastname == "" || username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""{
+	if othername == "" || lastname == "" || username == "" || password == "" || ipAddress == "" || email == "" || phone == "" || deviceImei == "" || deviceUuid == "" || deviceModel == ""	{
 		res := h.Response {
 			Status: "error",
 			Message:"Invalid request format Or required Credentials not complete",
@@ -633,8 +644,7 @@ func CreateUser(c echo.Context) error {
 	//fmt.Println("user_audits id ", userAuditId)
 
 	//TODO: Send the user a confirmation code to his/her email address inorder to confirm the email address registered
-	go sendConfirmationCode(userId, email, "emailConfirmation")
-
+	//go sendConfirmationCode(userId, email, "emailConfirmation")
 	uDetail := map[string]string {
 		"user_id": userId,
 		"phone_number" : phone,
@@ -643,7 +653,8 @@ func CreateUser(c echo.Context) error {
 
 	res := h.Response {
 		Status: "success",
-		Message:"You have successfully registered, a confirmation code has been sent to your email address, use it to confirm your email address after login in.",
+		Message:"You have successfully registered, do login and confirm your email address and verify your mobile number; DO YOU WISH TO LOGIN NOW?",
+		//Message:"You have successfully registered, a confirmation code has been sent to your email address, use it to confirm your email address after login in.",
 		Data: bs,
 	}
 	return c.JSON(http.StatusCreated, res)
