@@ -288,7 +288,7 @@ func VerifyTransaction(c echo.Context) error {
 	go runDbUpdateInfo(txReference,vReference,resp)
 	r := h.Response {
 	  Status: resp.ResponseStatus,
-	  Message: fmt.Sprintf("Payment transaction with reference, %s: %s => [%s] \n",txReference,resp.ResponseStatus,resp.GatewayResponse),
+	  Message: fmt.Sprintf("Payment transaction with reference %s: %s => [%s].\n DO YOU WISH TO MAKE ANOTHER PAYMENT?\n",txReference,resp.ResponseStatus,resp.GatewayResponse),
 	}
 	return c.JSON(http.StatusOK, r)
 }
