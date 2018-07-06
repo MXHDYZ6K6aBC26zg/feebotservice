@@ -178,6 +178,22 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		}
 		return c.JSON(http.StatusBadRequest, r)	
 	}
+	if s.Contains(categoryName,`Academic`) {
+		if academicSession == "" {
+			r := h.Response {
+				Status: "error",
+				Message:"The academic session is required",
+			}
+			return c.JSON(http.StatusBadRequest, r)
+		}
+		if academicSemester == "" {
+			r := h.Response {
+				Status: "error",
+				Message:"The term/semester field must be selected",
+			}
+			return c.JSON(http.StatusBadRequest, r)
+		}
+	}
 	floatAmount, err := strconv.ParseFloat(amount, 64)
 	intAmount := int(floatAmount)
 	if intAmount <= 0 || err != nil {
