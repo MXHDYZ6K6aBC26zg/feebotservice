@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/kenmobility/feezbot/gateways/paystack"
-	"github.com/kenmobility/feezbot/rand"
+	//"github.com/kenmobility/feezbot/rand"
 	"fmt"
 	"net/http"
 	h "github.com/kenmobility/feezbot/helper"
@@ -82,7 +82,7 @@ type MyJsonName struct {
 }
 
 
-//InitiateTransaction is a POST request handler used to initiate a transaction by the user
+/*InitiateTransaction is a POST request handler used to initiate a transaction by the user
 func InitiateTransaction(c echo.Context) error {
 	userId := s.Trim(c.FormValue("userId")," ")
 	merchantId := s.Trim(c.FormValue("merchantId")," ")
@@ -111,7 +111,7 @@ func InitiateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)
 	}
 	email,_,_ := isEmailAndPhoneConfirmed(userId)
-/* 	if emailConfStatus == false {
+	if emailConfStatus == false {
 		r := h.Response {
 			Status: "error",
 			Message:"Your email address has not yet been confirmed. Please confirm your email to proceed with payment",
@@ -124,7 +124,7 @@ func InitiateTransaction(c echo.Context) error {
 			Message:"Your phone number is yet to be verified. Please verify your phone number to proceed with payment",
 		}
 		return c.JSON(http.StatusForbidden, r)	
-	} */
+	} 
 	//Generate a unique reference for the transaction
 	reference := rand.RandStr(18, "alphanum")
 	//fmt.Println("generated reference is - ", reference)
@@ -149,14 +149,14 @@ func InitiateTransaction(c echo.Context) error {
 		Data: bs,
 	}
 	//TODO: call a function to insert the details of the user and the transaction into a table
-/* 	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,res.AuthorizationUrl,res.AccessCode,intAmount)
+	_,err = dbInsertUserTransaction(userId, reference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,res.AuthorizationUrl,res.AccessCode,intAmount)
 	if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	}
-	 */
+	 
 	return c.JSON(res.StatusCode, r)
 }
-
+*/
 
 func InitiatePaymentTransaction(c echo.Context) error {
 	userId := s.Trim(c.FormValue("userId")," ")
@@ -167,6 +167,8 @@ func InitiatePaymentTransaction(c echo.Context) error {
 	paymentReferenceName := c.FormValue("paymentReferenceName")
 	paymentReferenceId := c.FormValue("paymentReferenceId")
 	categoryName := s.Trim(c.FormValue("categoryName")," ")
+	academicSession := s.Trim(c.FormValue("academicSession")," ")
+	academicSemester := s.Trim(c.FormValue("academicSemester")," ")
 	vReference := s.Trim(c.FormValue("virtualReference")," ")
 
 	if userId == "" || merchantId == "" || merchantFeeId == "" || feeId == "" || amount == "" || categoryName == "" || paymentReferenceName == "" || paymentReferenceId == "" || vReference == ""{
@@ -214,7 +216,7 @@ func InitiatePaymentTransaction(c echo.Context) error {
 		return c.JSON(http.StatusForbidden, r)
 	}
 	//TODO: call a function to insert the details of the user and the transaction into a table
-	go dbInsertUserTransaction(userId, vReference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,intAmount)
+	go dbInsertUserTransaction(userId, vReference,categoryName,merchantId,feeId,paymentReferenceName,paymentReferenceId,academicSession,academicSemester,intAmount)
 	/* if err != nil {
 		fmt.Println("error while inserting user transaction detail : ", err)
 	} */
@@ -354,7 +356,7 @@ func getSettlementAccount(merchantFeeId string) (string,string,string,string,flo
 	return sMerchantName,accountCode,sFeeName,feeBearer,feeChargePercFloat, nil 
 }
 
-func dbInsertUserTransaction(uId,vReference,categoryName,merchantId,feeId,referenceName,referenceId string, amount int) (string, error) {
+func dbInsertUserTransaction(uId,vReference,categoryName,merchantId,feeId,referenceName,referenceId,academicSession,academicSemester string, amount int) (string, error) {
 	con, err := h.OpenConnection()
 	if err != nil {
 		return "", err
@@ -362,9 +364,9 @@ func dbInsertUserTransaction(uId,vReference,categoryName,merchantId,feeId,refere
 	defer con.Close()
 
 	var insertedTxId string
-	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","VirtualReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId") 
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING "Id"`
-	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,vReference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId).Scan(&insertedTxId)
+	insertQuery := `INSERT INTO "payment_transactions"("Id","UserId","VirtualReference","TxDate","TxAmount","TxPaymentGateway","MerchantId","FeeId","CategoryName","TxPaymentReferenceName","TxPaymentReferenceId","AcademicSession","AcademicSemester") 
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING "Id"`
+	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),uId,vReference,time.Now(),amount,"PayStack",merchantId,feeId,categoryName,referenceName,referenceId,academicSession,academicSemester).Scan(&insertedTxId)
 	if err != nil {
 		fmt.Println("transactionhandlers.go::dbInsertUserTransaction()::error encountered while inserting into payment_transactions : ", err)
 		return "",err

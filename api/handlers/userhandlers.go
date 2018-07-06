@@ -554,11 +554,11 @@ func CreateUser(c echo.Context) error {
 	//fetch User RoleId
 	var uRoleId string
 	roleQ := `SELECT "Id" FROM "AspNetRoles" WHERE "Name"= $1`
-	roleId,err := h.DBSelect(roleQ,"User")
+	roleId,err := h.DBSelect(roleQ,"USER")
 	if err != nil {
 		if err == h.NoRows {
 			//if Role doesn't exist, create one
-			err = con.Db.QueryRow(`INSERT INTO "AspNetRoles"("Id","Name") VALUES($1,$2) RETURNING "Id"`, h.GenerateUuid(),"User").Scan(&uRoleId)
+			err = con.Db.QueryRow(`INSERT INTO "AspNetRoles"("Id","Name") VALUES($1,$2) RETURNING "Id"`, h.GenerateUuid(),"USER").Scan(&uRoleId)
 			if err != nil {
 				fmt.Println("error encountered is ", err)
 			}
@@ -719,7 +719,7 @@ func aspNetUsersInsert(username,email,passHash,phone,phoneVeriStatus string) (st
 		if s.Contains(err.Error(),`pq: duplicate key value violates unique constraint "AspNetUsers_UserName_key"`) {
 			return "",errors.New("Username already Exists")
 		}
-		return "", errors.New("User creation unsuccessful, pls try again")
+		return "", errors.New("User creation unsuccessful, Do you want to try again?")
 	}
 	return userid,nil
 }
@@ -786,7 +786,7 @@ func dataRecordsInsert() (string, error) {
 	err = con.Db.QueryRow(insertQuery,h.GenerateUuid(),"Self",time.Now()).Scan(&insertedId)
 	if err != nil {
 		fmt.Println("error encountered while inserting into data_records due to ", err)
-		return "",errors.New("User creation unsuccessful, pls try again")
+		return "",errors.New("User creation unsuccessful, Do you want to try again?")
 	}
 	return insertedId, nil
 }
